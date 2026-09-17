@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>핵심 4단계 비디오 생성 파이프라인</title>
+  <title>핵심 5단계 비디오 생성 파이프라인</title>
   
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,13 +65,13 @@
 
   <!-- Header -->
   <header class="sticky top-0 z-50 glass-panel border-b border-slate-800">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="p-2 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-blue-500/20">
           <i data-lucide="git-branch" class="w-5 h-5 text-white"></i>
         </div>
         <div>
-          <h1 class="text-base font-bold text-white tracking-tight">핵심 4단계 비디오 생성 파이프라인</h1>
+          <h1 class="text-base font-bold text-white tracking-tight">핵심 5단계 비디오 생성 파이프라인</h1>
           <p class="text-xs text-slate-400">인풋(Input) • 툴(Tool) • 아웃풋(Output) 프로세스 요약</p>
         </div>
       </div>
@@ -84,29 +84,29 @@
   </header>
 
   <!-- Main Pipeline Content -->
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-10">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
 
-    <!-- Step Pipeline Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Step Pipeline Cards (5 Columns) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 
       <!-- STEP 1 -->
-      <div class="glass-card rounded-2xl p-5 flex flex-col justify-between border-t-4 border-t-blue-500">
+      <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border-t-4 border-t-blue-500">
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">
               STEP 1
             </span>
-            <span class="text-[11px] font-mono text-slate-400">script.txt</span>
+            <span class="text-[10px] font-mono text-slate-400">script.txt</span>
           </div>
 
           <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
               <i data-lucide="file-text" class="w-4 h-4 text-blue-400"></i>
               대본 작성 & 씬 분할
             </h2>
           </div>
 
-          <div class="space-y-2 pt-2 text-xs">
+          <div class="space-y-2 pt-1 text-xs">
             <!-- 인풋 -->
             <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
               <span class="font-bold text-blue-400 flex items-center gap-1.5 mb-1">
@@ -138,23 +138,23 @@
       </div>
 
       <!-- STEP 2 -->
-      <div class="glass-card rounded-2xl p-5 flex flex-col justify-between border-t-4 border-t-amber-500">
+      <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border-t-4 border-t-amber-500">
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
               STEP 2
             </span>
-            <span class="text-[11px] font-mono text-slate-400">Audio + Prompts</span>
+            <span class="text-[10px] font-mono text-slate-400">Audio + SRT</span>
           </div>
 
           <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
               <i data-lucide="mic" class="w-4 h-4 text-amber-400"></i>
-              음성·자막 & 프롬프트
+              음성·자막 생성
             </h2>
           </div>
 
-          <div class="space-y-2 pt-2 text-xs">
+          <div class="space-y-2 pt-1 text-xs">
             <!-- 인풋 -->
             <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
               <span class="font-bold text-blue-400 flex items-center gap-1.5 mb-1">
@@ -170,7 +170,7 @@
                 <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
                 툴 (Tool)
               </span>
-              <p class="text-slate-300 text-[11px]">ElevenLabs API (TTS·타임스탬프) + OpenAI GPT-4o API</p>
+              <p class="text-slate-300 text-[11px]">ElevenLabs API (TTS 타임스탬프) & 오디오 무음 제거</p>
             </div>
 
             <!-- 아웃풋 -->
@@ -179,37 +179,37 @@
                 <i data-lucide="arrow-up-from-dot" class="w-3.5 h-3.5"></i>
                 아웃풋 (Output)
               </span>
-              <p class="text-emerald-400 font-mono text-[11px]">tts_audio.mp3, subtitles.srt, prompts.json</p>
+              <p class="text-emerald-400 font-mono text-[11px]">tts_audio.mp3, subtitles.srt</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- STEP 3 -->
-      <div class="glass-card rounded-2xl p-5 flex flex-col justify-between border-t-4 border-t-purple-500">
+      <!-- STEP 3 (신규: 자막 기반 이미지 생성) -->
+      <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border-t-4 border-t-rose-500">
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/30">
               STEP 3
             </span>
-            <span class="text-[11px] font-mono text-slate-400">flow_videos/</span>
+            <span class="text-[10px] font-mono text-slate-400">images/*.png</span>
           </div>
 
           <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="video" class="w-4 h-4 text-purple-400"></i>
-              Google Flow 영상 생성
+            <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="sparkles" class="w-4 h-4 text-rose-400"></i>
+              자막 기반 Gemini 이미지 생성
             </h2>
           </div>
 
-          <div class="space-y-2 pt-2 text-xs">
+          <div class="space-y-2 pt-1 text-xs">
             <!-- 인풋 -->
             <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
               <span class="font-bold text-blue-400 flex items-center gap-1.5 mb-1">
                 <i data-lucide="arrow-down-to-dot" class="w-3.5 h-3.5"></i>
                 인풋 (Input)
               </span>
-              <p class="text-slate-300 text-[11px]">Step 2 시각 프롬프트 (<span class="font-mono text-slate-400">prompts.json</span>)</p>
+              <p class="text-slate-300 text-[11px]">Step 2 생성 자막 (<span class="font-mono text-slate-400">subtitles.srt</span>)</p>
             </div>
 
             <!-- 툴 -->
@@ -218,7 +218,55 @@
                 <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
                 툴 (Tool)
               </span>
-              <p class="text-slate-300 text-[11px]">Google Labs Flow AI + Playwright 브라우저 자동화 (또는 수동 업로드)</p>
+              <p class="text-slate-300 text-[11px]">Google Gemini Imagen 3 API (씬별 9:16 비주얼 렌더링)</p>
+            </div>
+
+            <!-- 아웃풋 -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+              <span class="font-bold text-emerald-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="arrow-up-from-dot" class="w-3.5 h-3.5"></i>
+                아웃풋 (Output)
+              </span>
+              <p class="text-emerald-400 font-mono text-[11px]">images/scene_*.png (고화질 이미지)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 (기존 Step 3: 이미지를 바탕으로 영상 생성) -->
+      <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border-t-4 border-t-purple-500">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              STEP 4
+            </span>
+            <span class="text-[10px] font-mono text-slate-400">flow_videos/</span>
+          </div>
+
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="video" class="w-4 h-4 text-purple-400"></i>
+              이미지 기반 Flow 영상 생성
+            </h2>
+          </div>
+
+          <div class="space-y-2 pt-1 text-xs">
+            <!-- 인풋 -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+              <span class="font-bold text-blue-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="arrow-down-to-dot" class="w-3.5 h-3.5"></i>
+                인풋 (Input)
+              </span>
+              <p class="text-slate-300 text-[11px]">Step 3 이미지 (<span class="font-mono text-slate-400">scene_*.png</span>) + 모션 프롬프트</p>
+            </div>
+
+            <!-- 툴 -->
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+              <span class="font-bold text-amber-400 flex items-center gap-1.5 mb-1">
+                <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
+                툴 (Tool)
+              </span>
+              <p class="text-slate-300 text-[11px]">Google Labs Flow AI (Image-to-Video) 자동화 / 업로드</p>
             </div>
 
             <!-- 아웃풋 -->
@@ -233,31 +281,31 @@
         </div>
       </div>
 
-      <!-- STEP 4 -->
-      <div class="glass-card rounded-2xl p-5 flex flex-col justify-between border-t-4 border-t-emerald-500">
+      <!-- STEP 5 (기존 Step 4: 최종 합성) -->
+      <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border-t-4 border-t-emerald-500">
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <span class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              STEP 4
+              STEP 5
             </span>
-            <span class="text-[11px] font-mono text-slate-400">final_video.mp4</span>
+            <span class="text-[10px] font-mono text-slate-400">final_video.mp4</span>
           </div>
 
           <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
               <i data-lucide="film" class="w-4 h-4 text-emerald-400"></i>
               최종 MP4 합성 렌더링
             </h2>
           </div>
 
-          <div class="space-y-2 pt-2 text-xs">
+          <div class="space-y-2 pt-1 text-xs">
             <!-- 인풋 -->
             <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
               <span class="font-bold text-blue-400 flex items-center gap-1.5 mb-1">
                 <i data-lucide="arrow-down-to-dot" class="w-3.5 h-3.5"></i>
                 인풋 (Input)
               </span>
-              <p class="text-slate-300 text-[11px]">flow_videos/*.mp4 + tts_audio.mp3 + subtitles.srt</p>
+              <p class="text-slate-300 text-[11px]">flow_videos/*.mp4 (또는 images) + tts_audio + srt</p>
             </div>
 
             <!-- 툴 -->
@@ -266,7 +314,7 @@
                 <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
                 툴 (Tool)
               </span>
-              <p class="text-slate-300 text-[11px]">FFmpeg (H.264 인코더, libass 자막 번인, 오디오 믹싱)</p>
+              <p class="text-slate-300 text-[11px]">FFmpeg (H.264 인코더, libass 자막 번인, 오디오 싱크)</p>
             </div>
 
             <!-- 아웃풋 -->
@@ -292,16 +340,21 @@
       <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500 hidden md:block"></i>
       <div class="flex items-center gap-2">
         <span class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-[11px]">2</span>
-        <span>음성·자막 & 프롬프트</span>
+        <span>음성·자막 생성</span>
       </div>
       <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500 hidden md:block"></i>
       <div class="flex items-center gap-2">
-        <span class="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-[11px]">3</span>
+        <span class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[11px]">3</span>
+        <span class="text-rose-300 font-semibold">Gemini 이미지 생성</span>
+      </div>
+      <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500 hidden md:block"></i>
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-[11px]">4</span>
         <span>Flow 영상 생성</span>
       </div>
       <i data-lucide="arrow-right" class="w-4 h-4 text-slate-500 hidden md:block"></i>
       <div class="flex items-center gap-2">
-        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px]">4</span>
+        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px]">5</span>
         <span class="text-emerald-400 font-bold">최종 MP4 완성</span>
       </div>
     </div>

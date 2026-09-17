@@ -239,9 +239,10 @@
       // API Keys state
       const [elevenlabsKey, setElevenlabsKey] = useState(() => localStorage.getItem('elevenlabs_key') || '');
       const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('openai_key') || '');
+      const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_key') || '');
       const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
-      // Workflow pipeline step: 1 (Script) | 2 (TTS) | 3 (SRT) | 4 (Prompt) | 5 (Flow Video) | 6 (Merge)
+      // Workflow pipeline step: 1 (Script) | 2 (TTS & SRT) | 3 (Gemini Images) | 5 (Flow Video) | 6 (Merge)
       const [currentStep, setCurrentStep] = useState(1);
 
       // Step 1: Script & Scenes
@@ -316,6 +317,10 @@
       useEffect(() => {
         localStorage.setItem('openai_key', openaiKey);
       }, [openaiKey]);
+
+      useEffect(() => {
+        localStorage.setItem('gemini_key', geminiKey);
+      }, [geminiKey]);
 
       useEffect(() => {
         if (window.lucide) {
@@ -740,6 +745,91 @@
         }
       };
 
+      // Step 3: 자막 기반 Gemini Imagen 3 씬별 이미지 일괄 생성
+      const handleGenerateGeminiImages = async () => {
+        if (!geminiKey.trim()) {
+          setError("Google Gemini API Key가 필요합니다. 상단 설정 탭 또는 Step 3 화면에서 입력해주세요.");
+          return;
+        }
+
+        setLoading(true);
+        setLoadingMsg("Google Gemini Imagen 3 API로 자막 기반 씬 이미지 일괄 생성 중...");
+        setError(null);
+
+        try {
+          const res = await fetch('/api/generate/gemini-scenes-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              gemini_key: geminiKey,
+              folder_name: selectedFolder,
+              aspect_ratio: '9:16',
+              prompts: videoPrompts
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          const updatedImages = { ...sceneImages };
+          (data.images || []).forEach(item => {
+            updatedImages[item.scene_index] = {
+              image_url: item.image_url,
+              image_path: item.image_path,
+              prompt: item.prompt
+            };
+          });
+          setSceneImages(updatedImages);
+          fetchProjectFolders();
+        } catch (err) {
+          setError(`[Gemini 이미지 생성 오류] ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleGenerateSingleGeminiImage = async (sceneIdx) => {
+        if (!geminiKey.trim()) {
+          setError("Google Gemini API Key가 필요합니다.");
+          return;
+        }
+        const scene = scenes[sceneIdx];
+        const promptToUse = videoPrompts[sceneIdx] || (scene ? scene.text : "");
+
+        setLoading(true);
+        setLoadingMsg(`장면 #${sceneIdx + 1} Gemini 이미지 생성 중...`);
+        setError(null);
+
+        try {
+          const res = await fetch('/api/generate/gemini-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              gemini_key: geminiKey,
+              prompt: promptToUse,
+              scene_index: sceneIdx,
+              folder_name: selectedFolder,
+              aspect_ratio: '9:16'
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setSceneImages(prev => ({
+            ...prev,
+            [sceneIdx]: {
+              image_url: data.image_url,
+              image_path: data.image_path,
+              prompt: promptToUse
+            }
+          }));
+          fetchProjectFolders();
+        } catch (err) {
+          setError(`[장면 #${sceneIdx + 1} Gemini 이미지 생성 실패] ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
       // Final Step 6: Merge Track A (TTS + SRT) and Track B (Video/Images)
       const handleRenderVideo = async () => {
         if (renderedVideo && (renderedVideo.video_url || renderedVideo.filename)) {
@@ -1149,11 +1239,11 @@
                 </button>
               </div>
 
-              {/* 4-STEP PROCESS BAR WITH EXECUTION BUTTONS */}
-              <div className="grid grid-cols-4 gap-3">
+              {/* 5-STEP PROCESS BAR WITH EXECUTION BUTTONS */}
+              <div className="grid grid-cols-5 gap-2.5">
                 {/* Step 1 Node */}
                 <div
-                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 1 ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                  class={`p-2.5 rounded-xl border flex flex-col justify-between transition ${currentStep === 1 ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-700 border-slate-200'
                     }`}
                 >
                   <div className="cursor-pointer" onClick={() => setCurrentStep(1)}>
@@ -1169,23 +1259,23 @@
                       setCurrentStep(1);
                       handleScriptChange({ target: { value: fullScript } });
                     }}
-                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 1 ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700'
+                    class={`mt-2 w-full py-1.5 px-1.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 1 ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                   >
                     <i data-lucide="check-circle" className="w-3.5 h-3.5"></i>
-                    <span>⚡ Step 1 대본 확정</span>
+                    <span>대본 확정</span>
                   </button>
                 </div>
 
                 {/* Step 2 Node */}
                 <div
-                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 2 || currentStep === 3 || currentStep === 4 ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                  class={`p-2.5 rounded-xl border flex flex-col justify-between transition ${currentStep === 2 ? 'bg-amber-600 text-white border-amber-600 shadow' : 'bg-white text-slate-700 border-slate-200'
                     }`}
                 >
                   <div className="cursor-pointer" onClick={() => setCurrentStep(2)}>
                     <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 2</div>
                     <div className="text-xs font-bold flex items-center justify-between">
-                      <span>2. 음성 & 프롬프트</span>
+                      <span>2. 음성 & 자막</span>
                       {ttsOutput && <span className="text-[10px] opacity-90">✓</span>}
                     </div>
                   </div>
@@ -1194,66 +1284,92 @@
                       e.stopPropagation();
                       setCurrentStep(2);
                       handleGenerateTtsAndSrt();
-                      handleGenerateVideoPrompts();
                     }}
                     disabled={loading}
-                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 2 || currentStep === 3 || currentStep === 4 ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700'
+                    class={`mt-2 w-full py-1.5 px-1.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 2 ? 'bg-white text-amber-700 hover:bg-amber-50' : 'bg-amber-600 text-white hover:bg-amber-700'
                       }`}
                   >
-                    <i data-lucide="play" className="w-3.5 h-3.5"></i>
-                    <span>⚡ Step 2 동시 생성</span>
+                    <i data-lucide="mic" className="w-3.5 h-3.5"></i>
+                    <span>음성·자막 생성</span>
                   </button>
                 </div>
 
-                {/* Step 3 Node: Flow 영상 저장 */}
+                {/* Step 3 Node: 자막 기반 Gemini 이미지 생성 */}
                 <div
-                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 5 ? 'bg-purple-600 text-white border-purple-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                  class={`p-2.5 rounded-xl border flex flex-col justify-between transition ${currentStep === 3 ? 'bg-rose-600 text-white border-rose-600 shadow' : 'bg-white text-slate-700 border-slate-200'
                     }`}
                 >
-                  <div className="cursor-pointer" onClick={() => setCurrentStep(5)}>
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(3)}>
                     <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 3</div>
                     <div className="text-xs font-bold flex items-center justify-between">
-                      <span>3. Flow 영상 저장</span>
-                      {flowVideos.length > 0 && <span className="text-[10px] opacity-90">✓ ({flowVideos.length}개)</span>}
+                      <span>3. Gemini 이미지</span>
+                      {Object.keys(sceneImages).length > 0 && <span className="text-[10px] opacity-90">✓ ({Object.keys(sceneImages).length})</span>}
                     </div>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCurrentStep(5);
+                      setCurrentStep(3);
+                      handleGenerateGeminiImages();
                     }}
-                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 5 ? 'bg-white text-purple-700 hover:bg-purple-50' : 'bg-purple-600 text-white hover:bg-purple-700'
+                    disabled={loading}
+                    class={`mt-2 w-full py-1.5 px-1.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 3 ? 'bg-white text-rose-700 hover:bg-rose-50' : 'bg-rose-600 text-white hover:bg-rose-700'
                       }`}
                   >
-                    <i data-lucide="folder-plus" className="w-3.5 h-3.5"></i>
-                    <span>📁 Step 3 영상 저장</span>
+                    <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
+                    <span>이미지 생성</span>
                   </button>
                 </div>
 
-                {/* Step 4 Node: 최종 MP4 합성 */}
+                {/* Step 4 Node: Flow 영상 저장 */}
                 <div
-                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 6 ? 'bg-emerald-600 text-white border-emerald-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                  class={`p-2.5 rounded-xl border flex flex-col justify-between transition ${currentStep === 4 ? 'bg-purple-600 text-white border-purple-600 shadow' : 'bg-white text-slate-700 border-slate-200'
                     }`}
                 >
-                  <div className="cursor-pointer" onClick={() => setCurrentStep(6)}>
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(4)}>
                     <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 4</div>
                     <div className="text-xs font-bold flex items-center justify-between">
-                      <span>4. 최종 MP4 합성</span>
+                      <span>4. Flow 영상</span>
+                      {flowVideos.length > 0 && <span className="text-[10px] opacity-90">✓ ({flowVideos.length})</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(4);
+                    }}
+                    class={`mt-2 w-full py-1.5 px-1.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 4 ? 'bg-white text-purple-700 hover:bg-purple-50' : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                  >
+                    <i data-lucide="video" className="w-3.5 h-3.5"></i>
+                    <span>영상 업로드</span>
+                  </button>
+                </div>
+
+                {/* Step 5 Node: 최종 MP4 합성 */}
+                <div
+                  class={`p-2.5 rounded-xl border flex flex-col justify-between transition ${currentStep === 5 ? 'bg-emerald-600 text-white border-emerald-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                >
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(5)}>
+                    <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 5</div>
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>5. 최종 합성</span>
                       {renderedVideo && <span className="text-[10px] opacity-90">✓</span>}
                     </div>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCurrentStep(6);
+                      setCurrentStep(5);
                       handleRenderVideo();
                     }}
                     disabled={loading}
-                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 6 ? 'bg-white text-emerald-800 hover:bg-emerald-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    class={`mt-2 w-full py-1.5 px-1.5 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 5 ? 'bg-white text-emerald-800 hover:bg-emerald-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
                       }`}
                   >
-                    <i data-lucide="video" className="w-3.5 h-3.5"></i>
-                    <span>⚡ Step 4 합성 렌더링</span>
+                    <i data-lucide="film" className="w-3.5 h-3.5"></i>
+                    <span>합성 렌더링</span>
                   </button>
                 </div>
               </div>
@@ -1309,7 +1425,7 @@
               )}
 
               {/* STEP 2: TTS / SRT / PROMPTS */}
-              {(currentStep === 2 || currentStep === 3 || currentStep === 4 || currentStep === 5) && (
+              {currentStep === 2 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   {/* TTS & SRT */}
                   <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
@@ -1453,11 +1569,11 @@
                           <span>🤖 Flow 브라우저 자동 입력 & 생성</span>
                         </button>
                         <button
-                          onClick={() => setCurrentStep(5)}
-                          className="py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                          onClick={() => setCurrentStep(3)}
+                          className="py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                         >
-                          <i data-lucide="folder-plus" className="w-3.5 h-3.5"></i>
-                          <span>📁 수동 파일 업로드 (Step 3 이동) ➔</span>
+                          <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
+                          <span>🎨 자막 기반 Gemini 이미지 생성 (Step 3 이동) ➔</span>
                         </button>
                       </div>
                     </div>
@@ -1465,17 +1581,143 @@
                 </div>
               )}
 
-              {/* STEP 3: FLOW AI VIDEO SAVE / UPLOAD */}
-              {currentStep === 5 && (
+              {/* STEP 3: GEMINI IMAGEN 3 IMAGE GENERATION */}
+              {currentStep === 3 && (
+                <div className="bg-white border border-slate-200 p-6 rounded-xl space-y-5 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between border-b pb-4 gap-3">
+                    <div>
+                      <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="sparkles" className="w-4 h-4 text-rose-600"></i>
+                        <span>자막 기반 Gemini Imagen 3 이미지 생성 (Step 3)</span>
+                      </h2>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Step 2의 자막을 바탕으로 Google Gemini Imagen 3 API를 호출하여 씬별 세로(9:16) 이미지를 생성합니다.
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleGenerateGeminiImages}
+                        disabled={loading}
+                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <i data-lucide="wand-2" className="w-3.5 h-3.5"></i>
+                        <span>⚡ 씬별 이미지 전체 생성</span>
+                      </button>
+                      <button
+                        onClick={() => setCurrentStep(4)}
+                        className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5"
+                      >
+                        <span>Step 4 Flow 영상 생성으로 이동 ➔</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Gemini API Key Bar */}
+                  <div className="p-3 bg-rose-50/70 border border-rose-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-rose-900 flex items-center gap-1">
+                        <i data-lucide="key" className="w-3.5 h-3.5 text-rose-600"></i>
+                        Google Gemini API Key:
+                      </span>
+                      <input
+                        type="password"
+                        value={geminiKey}
+                        onChange={(e) => setGeminiKey(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="p-1.5 bg-white border border-rose-300 rounded text-xs font-mono w-56 sm:w-72"
+                      />
+                    </div>
+                    <div className="text-[11px] text-rose-700">
+                      모델: <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">imagen-3.0-generate-002</code> (9:16 세로 숏폼)
+                    </div>
+                  </div>
+
+                  {/* Scene Subtitles & Generated Images Grid */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-700">
+                        씬별 자막 및 생성 이미지 ({scenes.length > 0 ? scenes.length : Object.keys(sceneImages).length}개)
+                      </h3>
+                      {Object.keys(sceneImages).length > 0 && (
+                        <span className="text-[11px] text-emerald-600 font-bold">
+                          ✓ {Object.keys(sceneImages).length}개 생성 완료
+                        </span>
+                      )}
+                    </div>
+
+                    {scenes.length === 0 && Object.keys(sceneImages).length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                        <p>아직 생성된 자막 및 이미지가 없습니다.</p>
+                        <p className="text-[11px] text-slate-400">Step 1에서 대본을 확정하거나 상단 '⚡ 씬별 이미지 전체 생성'을 클릭하세요.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {(scenes.length > 0 ? scenes : Object.keys(sceneImages).map(k => ({ index: Number(k), text: `Scene #${Number(k)+1}` }))).map((sc, idx) => {
+                          const imgObj = sceneImages[idx] || sceneImages[String(idx)];
+                          return (
+                            <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-bold rounded text-[10px]">
+                                  장면 #{idx + 1}
+                                </span>
+                                {imgObj && (
+                                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                    <i data-lucide="check-circle" className="w-3 h-3"></i> 생성됨
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Image Preview Box (9:16 Aspect Ratio) */}
+                              <div className="aspect-[9/16] bg-slate-900 rounded-lg overflow-hidden relative border border-slate-200 shadow-inner flex items-center justify-center">
+                                {imgObj && imgObj.image_url ? (
+                                  <img
+                                    src={imgObj.image_url}
+                                    alt={`Scene ${idx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-center p-3 text-slate-400 text-xs">
+                                    <i data-lucide="image" className="w-6 h-6 mx-auto mb-1 opacity-50"></i>
+                                    <span>이미지 대기 중</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Subtitle text */}
+                              <div className="text-[11px] text-slate-700 bg-white p-2 rounded border border-slate-200 line-clamp-3">
+                                <span className="font-bold text-slate-400 mr-1">자막:</span>
+                                {sc.text}
+                              </div>
+
+                              {/* Single Generate Button */}
+                              <button
+                                onClick={() => handleGenerateSingleGeminiImage(idx)}
+                                disabled={loading}
+                                className="w-full py-1.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-[11px] font-bold rounded shadow-sm transition flex items-center justify-center gap-1 disabled:opacity-50"
+                              >
+                                <i data-lucide="refresh-cw" className="w-3 h-3"></i>
+                                <span>{imgObj ? '다시 생성' : '이 장면 생성'}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: FLOW AI VIDEO SAVE / UPLOAD */}
+              {currentStep === 4 && (
                 <div className="bg-white border border-slate-200 p-6 rounded-xl space-y-5 shadow-sm">
                   <div className="flex items-center justify-between border-b pb-4">
                     <div>
                       <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <i data-lucide="folder-down" className="w-4 h-4 text-purple-600"></i>
-                        <span>Flow AI 생성 영상 업로드 & 저장 (Step 3)</span>
+                        <span>이미지 기반 Flow AI 영상 업로드 & 저장 (Step 4)</span>
                       </h2>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Flow AI 등에서 통합 프롬프트로 생성한 비디오 파일들(.mp4, .mov)을 업로드하여 저장하세요.
+                        Step 3에서 생성된 이미지를 바탕으로 Google Flow에서 생성한 비디오 파일들(.mp4, .mov)을 업로드하세요.
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -1488,7 +1730,7 @@
                         <span>🤖 Flow 자동 생성 실행</span>
                       </button>
                       <button
-                        onClick={() => setCurrentStep(6)}
+                        onClick={() => setCurrentStep(5)}
                         className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5"
                       >
                         <span>최종 MP4 합성 단계로 이동 ➔</span>
@@ -1555,11 +1797,11 @@
                 </div>
               )}
 
-              {/* STEP 4: FINAL MP4 MERGE */}
-              {currentStep === 6 && (
+              {/* STEP 5: FINAL MP4 MERGE */}
+              {currentStep === 5 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
-                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">3. 최종 비디오 합성</h2>
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">최종 비디오 합성 (Step 5)</h2>
                     
                     <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">
                       <div className="flex justify-between"><span>오디오:</span><span className="font-bold text-emerald-600">{ttsOutput ? '준비완료' : '샘플대체'}</span></div>
@@ -1617,6 +1859,17 @@
                       value={openaiKey}
                       onChange={(e) => setOpenaiKey(e.target.value)}
                       placeholder="sk-proj-..."
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Google Gemini Key (Imagen 3):</label>
+                    <input
+                      type="password"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      placeholder="AIzaSy..."
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                     />
                   </div>

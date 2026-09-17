@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.services.elevenlabs_service import get_voices, generate_tts_with_srt
 from backend.services.openai_service import generate_image, generate_video_prompts
+from backend.services.gemini_service import generate_image_with_gemini, parse_srt_subtitles, build_visual_prompt_from_subtitle
 from backend.services.video_renderer import render_video_with_ffmpeg
 
 PORT = 8080
@@ -524,6 +525,109 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                     "scene_index": scene_index,
                     "image_url": image_url,
                     "image_path": res_path
+                })
+
+            elif path == "/api/generate/gemini-image":
+                api_key = data.get("gemini_key", "").strip()
+                prompt = data.get("prompt", "").strip()
+                scene_index = data.get("scene_index", 0)
+                folder_name = data.get("folder_name", "folder_1").strip()
+                aspect_ratio = data.get("aspect_ratio", "9:16").strip()
+
+                if not api_key:
+                    return self.send_json_error(400, "Gemini API Key is required")
+                if not prompt:
+                    return self.send_json_error(400, "Image prompt is required")
+
+                img_dir = os.path.join(RESULT_DIR, folder_name, "images")
+                os.makedirs(img_dir, exist_ok=True)
+                img_filename = f"scene_{scene_index}.png"
+                output_path = os.path.join(img_dir, img_filename)
+
+                try:
+                    res_path = generate_image_with_gemini(
+                        api_key=api_key,
+                        prompt=prompt,
+                        output_image_path=output_path,
+                        aspect_ratio=aspect_ratio
+                    )
+                    return self.send_json_success({
+                        "status": "success",
+                        "scene_index": scene_index,
+                        "image_url": f"/result/{folder_name}/images/{img_filename}?t={int(os.times().elapsed * 1000)}",
+                        "image_path": res_path
+                    })
+                except Exception as e:
+                    return self.send_json_error(500, f"[Gemini 이미지 생성 실패] {str(e)}")
+
+            elif path == "/api/generate/gemini-scenes-images":
+                # 자막(SRT) 또는 씬 리스트를 바탕으로 각 씬별 Gemini 이미지 자동 생성
+                api_key = data.get("gemini_key", "").strip()
+                folder_name = data.get("folder_name", "folder_1").strip()
+                aspect_ratio = data.get("aspect_ratio", "9:16").strip()
+                custom_prompts = data.get("prompts", {})  # dict of scene_index -> prompt
+
+                if not api_key:
+                    return self.send_json_error(400, "Gemini API Key is required")
+
+                p_dir = os.path.join(RESULT_DIR, folder_name)
+                img_dir = os.path.join(p_dir, "images")
+                os.makedirs(img_dir, exist_ok=True)
+
+                srt_path = os.path.join(p_dir, "subtitles.srt")
+                subtitles = []
+                if os.path.exists(srt_path):
+                    with open(srt_path, "r", encoding="utf-8") as f:
+                        subtitles = parse_srt_subtitles(f.read())
+
+                # If no SRT items, fallback to scenes passed in payload or script.txt
+                if not subtitles:
+                    scenes_in = data.get("scenes", [])
+                    if scenes_in:
+                        subtitles = [{"index": idx, "text": s} for idx, s in enumerate(scenes_in)]
+                    else:
+                        script_path = os.path.join(p_dir, "script.txt")
+                        if os.path.exists(script_path):
+                            with open(script_path, "r", encoding="utf-8") as f:
+                                lines = [l.strip() for l in f.read().split("\n") if l.strip()]
+                                subtitles = [{"index": idx, "text": l} for idx, l in enumerate(lines)]
+
+                if not subtitles:
+                    return self.send_json_error(400, "No subtitles or scenes found. Please complete Step 2 first.")
+
+                generated_images = []
+                errors = []
+
+                for sub in subtitles:
+                    idx = sub.get("index", 0)
+                    text = sub.get("text", "")
+                    prompt = custom_prompts.get(str(idx)) or custom_prompts.get(idx) or build_visual_prompt_from_subtitle(text)
+                    
+                    img_filename = f"scene_{idx}.png"
+                    output_path = os.path.join(img_dir, img_filename)
+
+                    try:
+                        res_path = generate_image_with_gemini(
+                            api_key=api_key,
+                            prompt=prompt,
+                            output_image_path=output_path,
+                            aspect_ratio=aspect_ratio
+                        )
+                        generated_images.append({
+                            "scene_index": idx,
+                            "subtitle": text,
+                            "prompt": prompt,
+                            "image_url": f"/result/{folder_name}/images/{img_filename}?t={int(os.times().elapsed * 1000)}",
+                            "image_path": res_path
+                        })
+                    except Exception as e:
+                        errors.append(f"Scene {idx} ({text[:15]}...): {str(e)}")
+
+                return self.send_json_success({
+                    "status": "success" if generated_images else "error",
+                    "images": generated_images,
+                    "errors": errors,
+                    "count": len(generated_images)
                 })
 
             elif path == "/api/upload/flow-video":

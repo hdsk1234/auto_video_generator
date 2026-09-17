@@ -232,12 +232,14 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    const ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945";
+
     function App() {
-      // Main navigation tab state: 'studio' | 'demo' | 'settings'
+      // Main navigation tab state: 'studio' | 'demo'
       const [activeTab, setActiveTab] = useState('studio');
 
-      // API Keys state
-      const [elevenlabsKey, setElevenlabsKey] = useState(() => localStorage.getItem('elevenlabs_key') || '');
+      // API Keys state (ElevenLabs API Key is hardcoded)
+      const [elevenlabsKey] = useState(ELEVENLABS_API_KEY);
       const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('openai_key') || '');
       const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_key') || '');
       const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
@@ -308,11 +310,9 @@
       useEffect(() => {
         fetchProjectFolders();
         handleLoadProjectFolder('folder_1');
+        fetchVoices();
+        localStorage.setItem('elevenlabs_key', ELEVENLABS_API_KEY);
       }, []);
-
-      useEffect(() => {
-        localStorage.setItem('elevenlabs_key', elevenlabsKey);
-      }, [elevenlabsKey]);
 
       useEffect(() => {
         localStorage.setItem('openai_key', openaiKey);
@@ -516,11 +516,6 @@
       };
 
       const fetchVoices = async () => {
-        if (!elevenlabsKey) {
-          setError("ElevenLabs API Key를 [API Key 설정] 탭에서 입력해 주세요.");
-          setActiveTab('settings');
-          return;
-        }
         setLoading(true);
         setLoadingMsg("ElevenLabs 음성목록 불러오는 중...");
         setError(null);
@@ -538,7 +533,7 @@
             setSelectedVoice(data.voices[0].voice_id);
           }
         } catch (err) {
-          setError(err.message);
+          console.warn("fetchVoices warning:", err);
         } finally {
           setLoading(false);
         }
@@ -630,11 +625,7 @@
             });
             fetchProjectFolders();
 
-            if (!elevenlabsKey) {
-              setError("💡 ElevenLabs API Key가 없어 Step 1 대본 기반으로 테스트 자막을 생성했습니다. 실제 AI 음성을 생성하려면 우측 상단 [API Key 설정] 탭에서 ElevenLabs 키를 입력하세요.");
-            } else {
-              setError(`[ElevenLabs API 안내] ${err.message} ➔ Step 1 대본 기반으로 자막을 생성했습니다.`);
-            }
+            setError(`[ElevenLabs API 안내] ${err.message} ➔ Step 1 대본 기반으로 자막을 생성했습니다.`);
           } catch (demoErr) {
             setError(`[자막 생성 오류] ${demoErr.message}`);
           }
@@ -763,7 +754,7 @@
       // Step 3: 자막 기반 Gemini Imagen 3 씬별 이미지 일괄 생성
       const handleGenerateGeminiImages = async () => {
         if (!geminiKey.trim()) {
-          setError("Google Gemini API Key가 필요합니다. 상단 설정 탭 또는 Step 3 화면에서 입력해주세요.");
+          setError("Google Gemini API Key가 필요합니다. Step 3 화면에서 입력해주세요.");
           return;
         }
 
@@ -1161,15 +1152,6 @@
               >
                 <span>테스트 모드</span>
                 <span className="text-[9px] px-1 bg-amber-400 text-amber-950 font-extrabold rounded">Demo</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('settings')}
-                class={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                  }`}
-              >
-                <span>API Key</span>
-                <span class={`w-2 h-2 rounded-full ${elevenlabsKey && openaiKey ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
               </button>
 
               <a
@@ -1799,61 +1781,6 @@
                 </div>
               )}
 
-            </main>
-          )}
-
-          {/* TAB 3: API KEYS */}
-          {activeTab === 'settings' && (
-            <main className="flex-1 max-w-xl w-full mx-auto p-6">
-              <div className="bg-white border border-slate-200 p-6 rounded-xl space-y-4 shadow-sm">
-                <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">API Key 설정</h2>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">ElevenLabs Key:</label>
-                    <input
-                      type="password"
-                      value={elevenlabsKey}
-                      onChange={(e) => setElevenlabsKey(e.target.value)}
-                      placeholder="sk_..."
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">OpenAI Key:</label>
-                    <input
-                      type="password"
-                      value={openaiKey}
-                      onChange={(e) => setOpenaiKey(e.target.value)}
-                      placeholder="sk-proj-..."
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Google Gemini Key (Imagen 3):</label>
-                    <input
-                      type="password"
-                      value={geminiKey}
-                      onChange={(e) => setGeminiKey(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setSaveSuccessMsg(true);
-                      setTimeout(() => setSaveSuccessMsg(false), 2000);
-                    }}
-                    className="w-full py-2.5 bg-blue-600 text-white text-xs font-bold rounded-lg"
-                  >
-                    저장하기
-                  </button>
-                  {saveSuccessMsg && <p className="text-xs text-emerald-600 font-bold text-center">✓ 저장되었습니다.</p>}
-                </div>
-              </div>
             </main>
           )}
 

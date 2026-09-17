@@ -7,6 +7,7 @@ import ssl
 from backend.services.srt_generator import generate_srt_from_timestamps
 
 ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
+DEFAULT_ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945"
 
 # Unverified SSL context to handle macOS python certificate issues
 ssl_context = ssl.create_default_context()
@@ -24,8 +25,10 @@ FREE_PREMADE_VOICE_IDS = [
 
 DEFAULT_FREE_VOICE_ID = FREE_PREMADE_VOICE_IDS[0]
 
-def get_voices(api_key: str) -> list:
+def get_voices(api_key: str = None) -> list:
     """Fetch available voices from ElevenLabs API"""
+    if not api_key:
+        api_key = DEFAULT_ELEVENLABS_API_KEY
     req = urllib.request.Request(
         f"{ELEVENLABS_BASE_URL}/voices",
         headers={"xi-api-key": api_key, "Accept": "application/json"}
@@ -53,11 +56,11 @@ def get_voices(api_key: str) -> list:
         raise RuntimeError(f"ElevenLabs Voices API Error: {str(e)}")
 
 def generate_tts_with_srt(
-    api_key: str,
-    text: str,
-    voice_id: str,
-    output_audio_path: str,
-    output_srt_path: str,
+    api_key: str = None,
+    text: str = "",
+    voice_id: str = "",
+    output_audio_path: str = "",
+    output_srt_path: str = "",
     model_id: str = "eleven_multilingual_v2",
     tried_voices: set = None,
     remove_silence: bool = False,
@@ -69,6 +72,9 @@ def generate_tts_with_srt(
     and applies optional silence removal and speed adjustments.
     Returns metadata dict. Automatically falls back across free voices if 402 error occurs.
     """
+    if not api_key:
+        api_key = DEFAULT_ELEVENLABS_API_KEY
+
     if tried_voices is None:
         tried_voices = set()
 

@@ -23,6 +23,7 @@ from backend.services.gemini_service import generate_image_with_gemini, parse_sr
 from backend.services.video_renderer import render_video_with_ffmpeg
 
 PORT = 8080
+DEFAULT_ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
@@ -441,10 +442,17 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             elif path == "/api/elevenlabs/voices":
-                api_key = data.get("elevenlabs_key", "").strip()
-                if not api_key:
-                    return self.send_json_error(400, "ElevenLabs API Key is required")
-                voices = get_voices(api_key)
+                api_key = data.get("elevenlabs_key", "").strip() or DEFAULT_ELEVENLABS_API_KEY
+                try:
+                    voices = get_voices(api_key)
+                except Exception as e:
+                    voices = [
+                        {"voice_id": "JBFqnCBsd6RMkjVDRZzb", "name": "George (무료 지원)", "category": "premade"},
+                        {"voice_id": "cgSgspJ2msm6clMCkdW9", "name": "Jessica (무료 지원)", "category": "premade"},
+                        {"voice_id": "pNInz6obpgDQGcFmaJgB", "name": "Adam (무료 지원)", "category": "premade"},
+                        {"voice_id": "EXAVITQu4vr4xnSDxMaL", "name": "Bella (무료 지원)", "category": "premade"},
+                        {"voice_id": "21m00Tcm4TlvDq8ikWAM", "name": "Rachel (무료 지원)", "category": "premade"}
+                    ]
                 return self.send_json_success({"voices": voices})
 
             elif path == "/api/generate/tts-srt":
@@ -452,7 +460,7 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 import backend.services.elevenlabs_service as elevenlabs_mod
                 importlib.reload(elevenlabs_mod)
 
-                api_key = data.get("elevenlabs_key", "").strip()
+                api_key = data.get("elevenlabs_key", "").strip() or DEFAULT_ELEVENLABS_API_KEY
                 text = data.get("text", "").strip()
                 voice_id = data.get("voice_id", "").strip()
                 folder_name = data.get("folder_name", "").strip()
@@ -820,17 +828,18 @@ def run_server(start_port=8080):
     port = int(os.environ.get("PORT", start_port))
     max_attempts = 10
     httpd = None
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
 
     for attempt in range(max_attempts):
         current_port = port + attempt
         try:
             server_address = ('', current_port)
             httpd = socketserver.ThreadingTCPServer(server_address, AutoVideoHandler)
-            httpd.allow_reuse_address = True
             print(f"🚀 Auto Video Generator Web Server running at http://localhost:{current_port}")
             break
         except OSError as e:
-            if e.errno == 48: # Address already in use
+            import errno
+            if e.errno in (errno.EADDRINUSE, 48, 98):
                 print(f"⚠️ Port {current_port} is already in use, trying port {current_port + 1}...")
                 continue
             else:

@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 자동 비디오 제네레이터 (Auto Video Generator)</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            palette: {
+              primary: '#3368A0',   // Deep Blue
+              secondary: '#66A3BF', // Soft Blue
+              sage: '#C8DFDB',      // Sage Mint
+              cream: '#F2EFE7',     // Cream Background
+              dark: '#1E293B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* 1. Global Header Navigation Bar */
+    .ui-navbar {
+      background: #0F172A;
+      border-bottom: 1px solid #1E293B;
+      color: #F8FAFC;
+    }
+
+    .ui-nav-tab {
+      color: #94A3B8;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .ui-nav-tab:hover {
+      color: #F8FAFC;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .ui-nav-tab-active {
+      color: #FFFFFF !important;
+      background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%) !important;
+      border-color: #60A5FA !important;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+
+    /* 2. WorkSpace / Pipeline Bar */
+    .ui-pipeline-bar {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    /* 3. INPUT Card (입력 영역: White Canvas + Blue Accent) */
+    .ui-card-input {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-top: 4px solid #2563EB;
+      box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.05);
+      border-radius: 1rem;
+    }
+
+    /* 4. OUTPUT Card (결과/프리뷰 영역: Dark Slate + Emerald Accent) */
+    .ui-card-output {
+      background: #0F172A;
+      color: #F8FAFC;
+      border: 1px solid #1E293B;
+      border-top: 4px solid #10B981;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+      border-radius: 1rem;
+    }
+
+    /* 5. Sub-Output Light Card (텍스트/자막 결과물) */
+    .ui-card-result-light {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-left: 4px solid #16A34A;
+      border-radius: 0.75rem;
+    }
+
+    /* Form Fields & Controls */
+    .ui-input-field {
+      background-color: #F8FAFC;
+      border: 1.5px solid #CBD5E1;
+      color: #0F172A;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .ui-input-field:focus {
+      background-color: #FFFFFF;
+      border-color: #2563EB;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    /* Badges */
+    .ui-badge-input {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.375rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .ui-badge-output {
+      background: #ECFDF5;
+      color: #047857;
+      border: 1px solid #A7F3D0;
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.375rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Buttons Hierarchy */
+    .ui-btn-primary {
+      background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      color: #FFFFFF;
+      font-weight: 600;
+      transition: all 0.15s ease-in-out;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+
+    .ui-btn-primary:hover {
+      background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+
+    .ui-btn-accent {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #FFFFFF;
+      font-weight: 700;
+      transition: all 0.15s ease-in-out;
+      box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+    }
+
+    .ui-btn-accent:hover {
+      background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);
+    }
+
+    .ui-btn-secondary {
+      background: #FFFFFF;
+      color: #334155;
+      border: 1px solid #CBD5E1;
+      font-weight: 500;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .ui-btn-secondary:hover {
+      background: #F1F5F9;
+      color: #0F172A;
+      border-color: #94A3B8;
+    }
+
+    /* Step Pipeline Progress Bar */
+    .step-active {
+      background: #2563EB;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+
+    .step-completed {
+      background: #10B981;
+      color: #FFFFFF;
+    }
+
+    .step-inactive {
+      background: #E2E8F0;
+      color: #64748B;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #94A3B8;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body className="min-h-screen">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      // Main navigation tab state: 'studio' | 'demo' | 'settings'
+      const [activeTab, setActiveTab] = useState('studio');
+
+      // API Keys state
+      const [elevenlabsKey, setElevenlabsKey] = useState(() => localStorage.getItem('elevenlabs_key') || '');
+      const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('openai_key') || '');
+      const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+
+      // Workflow pipeline step: 1 (Script) | 2 (TTS) | 3 (SRT) | 4 (Prompt) | 5 (Flow Video) | 6 (Merge)
+      const [currentStep, setCurrentStep] = useState(1);
+
+      // Step 1: Script & Scenes
+      const [fullScript, setFullScript] = useState(
+        "성경에는 '주식하지 말라'는 말이 없습니다.\n" +
+        "그런데 수익률이 하루 기분을 정한다면, 이미 돈이 주인이 된 걸지도 모릅니다.\n" +
+        "예수님은 큰 풍년을 맞은 부자 이야기를 하셨습니다.\n" +
+        "부자는 창고를 더 크게 짓고 말했죠. \"여러 해 쓸 게 쌓였으니, 이제 쉬고 즐기자.\"\n" +
+        "그런데 바로 그날, 그의 생명은 끝납니다.\n" +
+        "문제는 풍년도, 큰 창고도 아니었습니다.\n" +
+        "그는 자기만을 위해 쌓았고, 그 재산이면 인생도 안전할 거라 여겼습니다.\n" +
+        "예수님은 사람의 생명이 소유의 크기에 달린 게 아니라고 했습니다.\n" +
+        "그래서 '주식 금지'만으로는 답이 안 됩니다.\n" +
+        "매수 전에 이것만 물어보세요.\n" +
+        "잃어도 내 책임을 지킬 수 있는가, 계좌가 내 기분을 지배하는가, 벌어서 나만 더 쌓으려는가.\n" +
+        "주식을 갖고 있느냐보다, 주식이 나를 갖고 있느냐가 더 중요합니다."
+      );
+      const [scenes, setScenes] = useState([]);
+
+      // Voices (Default to guaranteed free premade voice: George)
+      const [voices, setVoices] = useState([]);
+      const [selectedVoice, setSelectedVoice] = useState('JBFqnCBsd6RMkjVDRZzb');
+
+      // Track A Outputs (Audio & Subtitles)
+      const [ttsOutput, setTtsOutput] = useState(null);
+
+      // Audio Post-Processing (Silence removal & Speed controls)
+      const [removeSilence, setRemoveSilence] = useState(true);
+      const [silenceDb, setSilenceDb] = useState(-40);
+      const [audioSpeed, setAudioSpeed] = useState(1.0);
+
+      // Default Sample Prompt for Test/Demo mode & single prompt formatting
+      const defaultSamplePrompt = `다음 3개의 프롬프트로 각각 독립된 영상을 동시에 생성해줘:
+1. 노을이 지는 해변을 달리는 백마, 시네마틱 4k
+2. 비 내리는 사이버펑크 도시의 네온사인 골목, 드론 샷
+3. 깊은 숲속에서 빛나는 신비로운 버섯 군락, 매크로 렌즈`;
+
+      // Track B Outputs (Video Prompts & Video Clips/Images)
+      const [videoPrompts, setVideoPrompts] = useState({});
+      const [combinedPrompt, setCombinedPrompt] = useState(defaultSamplePrompt);
+      const [sceneImages, setSceneImages] = useState({});
+
+      // Final Output
+      const [renderedVideo, setRenderedVideo] = useState(null);
+      const [copiedIdx, setCopiedIdx] = useState(null);
+
+      // Demo Mode state
+      const [demoData, setDemoData] = useState(null);
+      const [demoRenderedVideo, setDemoRenderedVideo] = useState(null);
+
+      // Flow Videos state
+      const [flowVideos, setFlowVideos] = useState([]);
+
+      // Loading states
+      const [loading, setLoading] = useState(false);
+      const [loadingMsg, setLoadingMsg] = useState('');
+      const [error, setError] = useState(null);
+
+      // Project Folder Management State (auto_video_generator/result/)
+      const [projectFolders, setProjectFolders] = useState([]);
+      const [selectedFolder, setSelectedFolder] = useState('folder_1');
+
+      useEffect(() => {
+        fetchProjectFolders();
+        handleLoadProjectFolder('folder_1');
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('elevenlabs_key', elevenlabsKey);
+      }, [elevenlabsKey]);
+
+      useEffect(() => {
+        localStorage.setItem('openai_key', openaiKey);
+      }, [openaiKey]);
+
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+
+      const fetchProjectFolders = async () => {
+        try {
+          const res = await fetch('/api/projects/list');
+          const data = await res.json();
+          if (data.projects) {
+            setProjectFolders(data.projects);
+          }
+        } catch (err) {
+          console.error("Failed to fetch project folders:", err);
+        }
+      };
+
+      const handleLoadProjectFolder = async (folderName) => {
+        setSelectedFolder(folderName);
+        setLoading(true);
+        setLoadingMsg(`📁 작업 폴더 [${folderName}] 에셋 로드 중...`);
+        setError(null);
+        try {
+          const res = await fetch('/api/projects/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_name: folderName })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          if (data.full_script) {
+            setFullScript(data.full_script);
+            splitScriptIntoScenes(data.full_script);
+          }
+          setTtsOutput(data.tts_output || null);
+          setVideoPrompts(data.video_prompts || {});
+          setSceneImages(data.scene_images || {});
+          setFlowVideos(data.flow_videos || []);
+          setRenderedVideo(data.rendered_video || null);
+        } catch (err) {
+          setError(`[폴더 로드 오류] ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleUploadFlowVideos = async (files) => {
+        if (!files || files.length === 0) return;
+        setLoading(true);
+        setLoadingMsg("🎬 Flow 생성 영상 업로드 및 저장 중...");
+        setError(null);
+
+        try {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const reader = new FileReader();
+            await new Promise((resolve, reject) => {
+              reader.onload = async (e) => {
+                try {
+                  const base64Data = e.target.result;
+                  const res = await fetch('/api/upload/flow-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      folder_name: selectedFolder,
+                      filename: file.name,
+                      file_data: base64Data
+                    })
+                  });
+                  const data = await res.json();
+                  if (data.error) throw new Error(data.error);
+                  if (data.video) {
+                    setFlowVideos(prev => [...prev, data.video]);
+                  }
+                  resolve();
+                } catch (err) {
+                  reject(err);
+                }
+              };
+              reader.onerror = (err) => reject(err);
+              reader.readAsDataURL(file);
+            });
+          }
+          fetchProjectFolders();
+        } catch (err) {
+          setError(`[영상의 업로드/저장 오류] ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleDeleteFlowVideo = async (filename) => {
+        try {
+          await fetch('/api/delete/flow-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folder_name: selectedFolder,
+              filename: filename
+            })
+          });
+          setFlowVideos(prev => prev.filter(v => v.video_name !== filename));
+        } catch (err) {
+          console.error("Failed to delete flow video:", err);
+        }
+      };
+
+      const handleAutomateFlowVideo = async () => {
+        setLoading(true);
+        setLoadingMsg("🤖 Playwright 봇이 Flow 브라우저를 열어 프롬프트를 자동 입력하고 영상 생성을 진행 중입니다...");
+        setError(null);
+
+        try {
+          const res = await fetch('/api/automate/flow-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folder_name: selectedFolder,
+              prompt: combinedPrompt
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          if (data.videos && data.videos.length > 0) {
+            setFlowVideos(prev => [...prev, ...data.videos]);
+          }
+          fetchProjectFolders();
+          setCurrentStep(5);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleCreateProjectFolder = async (folderName) => {
+        if (!folderName || !folderName.trim()) return;
+        const cleanName = folderName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+        try {
+          const res = await fetch('/api/projects/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_name: cleanName })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          
+          await fetchProjectFolders();
+          await handleLoadProjectFolder(cleanName);
+        } catch (err) {
+          setError(`[폴더 생성 오류] ${err.message}`);
+        }
+      };
+
+      const handleSaveScriptToFolder = async (scriptText) => {
+        try {
+          await fetch('/api/projects/save-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_name: selectedFolder, script: scriptText })
+          });
+        } catch (err) {
+          console.error("Save script error:", err);
+        }
+      };
+
+      const handleSaveKeys = () => {
+        localStorage.setItem('elevenlabs_key', elevenlabsKey);
+        localStorage.setItem('openai_key', openaiKey);
+        setSaveSuccessMsg(true);
+        setTimeout(() => setSaveSuccessMsg(false), 3000);
+      };
+
+      const splitScriptIntoScenes = (scriptText) => {
+        const lines = scriptText.split('\n').filter(l => l.trim().length > 0);
+        const newScenes = lines.map((line, idx) => ({
+          id: idx,
+          text: line,
+          prompt: `Cinematic 8k video of ${line.slice(0, 80)}, photorealistic, 60fps, dynamic camera motion`
+        }));
+        setScenes(newScenes);
+      };
+
+      const handleScriptChange = (e) => {
+        const text = e.target.value;
+        setFullScript(text);
+        splitScriptIntoScenes(text);
+        handleSaveScriptToFolder(text);
+      };
+
+      const fetchVoices = async () => {
+        if (!elevenlabsKey) {
+          setError("ElevenLabs API Key를 [API Key 설정] 탭에서 입력해 주세요.");
+          setActiveTab('settings');
+          return;
+        }
+        setLoading(true);
+        setLoadingMsg("ElevenLabs 음성목록 불러오는 중...");
+        setError(null);
+
+        try {
+          const res = await fetch('/api/elevenlabs/voices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elevenlabs_key: elevenlabsKey })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          setVoices(data.voices || []);
+          if (data.voices && data.voices.length > 0) {
+            setSelectedVoice(data.voices[0].voice_id);
+          }
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleApplyAudioPostProcessing = async () => {
+        setLoading(true);
+        setLoadingMsg(`🔊 데시벨(${silenceDb}dB) 공백 제거 및 배속(${audioSpeed}x) 후처리 적용 중...`);
+        setError(null);
+        try {
+          const res = await fetch('/api/audio/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folder_name: selectedFolder,
+              remove_silence: removeSilence,
+              silence_db: silenceDb,
+              speed: audioSpeed
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setTtsOutput(data);
+          fetchProjectFolders();
+        } catch (err) {
+          setError(`[오디오 후처리 오류] ${err.message}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Track A: Step 2 & 3 (TTS & SRT) with automatic Demo Sample Fallback
+      const handleGenerateTtsAndSrt = async () => {
+        if (ttsOutput && (ttsOutput.audio_path || ttsOutput.audio_url)) {
+          setLoadingMsg("기존 TTS 음성 및 자막 데이터가 존재하여 스킵합니다.");
+          setCurrentStep(3);
+          return;
+        }
+
+        setLoading(true);
+        setLoadingMsg("ElevenLabs TTS 오디오 생성 및 with_timestamps 기반 SRT 자막 작성 중...");
+        setError(null);
+
+        try {
+          if (!elevenlabsKey) {
+            throw new Error("ElevenLabs API Key 미입력 ➔ 샘플 오디오 및 SRT 자막으로 자동 대체합니다.");
+          }
+          const res = await fetch('/api/generate/tts-srt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              elevenlabs_key: elevenlabsKey,
+              text: fullScript,
+              voice_id: selectedVoice,
+              folder_name: selectedFolder,
+              remove_silence: removeSilence,
+              silence_db: silenceDb,
+              speed: audioSpeed
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setTtsOutput(data);
+          setCurrentStep(3);
+          fetchProjectFolders();
+        } catch (err) {
+          console.warn("TTS API 실패 또는 키 미입력 ➔ 샘플 데모 데이터 적용:", err.message);
+          try {
+            const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+            const demoData = await demoRes.json();
+            setTtsOutput({
+              audio_url: demoData.audio_url,
+              audio_path: demoData.audio_path,
+              srt_url: demoData.srt_url,
+              srt_path: demoData.srt_path,
+              srt_content: demoData.srt_content,
+              duration_seconds: demoData.duration_seconds || 10.0
+            });
+            setCurrentStep(3);
+          } catch (demoErr) {
+            setError(`[샘플 오디오 로드 오류] ${demoErr.message}`);
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Track B: Step 4 (Video Prompts) with automatic Demo Sample Fallback
+      const handleGenerateVideoPrompts = async () => {
+        setLoading(true);
+        setLoadingMsg("GPT를 사용해 통합 AI 영상 제작용 프롬프트 생성 중...");
+        setError(null);
+
+        try {
+          if (!openaiKey) {
+            throw new Error("OpenAI API Key 미입력 ➔ 스마트 템플릿 프롬프트로 자동 대체합니다.");
+          }
+          const res = await fetch('/api/generate/video-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              openai_key: openaiKey,
+              scenes: scenes,
+              folder_name: selectedFolder
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          const newPrompts = {};
+          data.prompts.forEach(p => {
+            newPrompts[p.scene_index] = p.prompt;
+          });
+          setVideoPrompts(newPrompts);
+
+          const promptList = data.prompts.map((p, idx) => `${idx + 1}. ${p.prompt}`).join('\n');
+          setCombinedPrompt(`다음 ${data.prompts.length}개의 프롬프트로 각각 독립된 영상을 동시에 생성해줘:\n${promptList}`);
+          setCurrentStep(4);
+          fetchProjectFolders();
+        } catch (err) {
+          console.warn("GPT 프롬프트 생성 실패 또는 키 미입력 ➔ 스마트 템플릿 대체:", err.message);
+          const fallbackPrompts = {};
+          const promptLines = [];
+          scenes.forEach((sc, idx) => {
+            const pText = `Cinematic 8k video, photorealistic, ${sc.text}, slow camera motion, 60fps, octane render, vivid lighting`;
+            fallbackPrompts[idx] = pText;
+            promptLines.push(`${idx + 1}. ${pText}`);
+          });
+          setVideoPrompts(fallbackPrompts);
+          if (scenes.length > 0) {
+            setCombinedPrompt(`다음 ${scenes.length}개의 프롬프트로 각각 독립된 영상을 동시에 생성해줘:\n` + promptLines.join('\n'));
+          } else {
+            setCombinedPrompt(defaultSamplePrompt);
+          }
+          setCurrentStep(4);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleCopyPrompt = (text) => {
+        const textToCopy = text || combinedPrompt;
+        navigator.clipboard.writeText(textToCopy);
+        setCopiedIdx('single');
+        setTimeout(() => setCopiedIdx(null), 2000);
+      };
+
+      // Track B: Optional Background Image generation for preview/fallback
+      const handleGenerateImage = async (sceneIdx) => {
+        const scene = scenes[sceneIdx];
+        const promptToUse = videoPrompts[sceneIdx] || (scene ? scene.prompt : "");
+
+        setLoading(true);
+        setLoadingMsg(`장면 #${sceneIdx + 1} 테스트 배경 이미지 생성 중...`);
+        setError(null);
+
+        try {
+          if (!openaiKey) {
+            throw new Error("OpenAI API Key 미입력 ➔ 샘플 이미지로 자동 대체합니다.");
+          }
+          const res = await fetch('/api/generate/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              openai_key: openaiKey,
+              prompt: promptToUse,
+              scene_index: sceneIdx,
+              folder_name: selectedFolder
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setSceneImages(prev => ({
+            ...prev,
+            [sceneIdx]: {
+              image_url: data.image_url,
+              image_path: data.image_path,
+              prompt: promptToUse
+            }
+          }));
+          fetchProjectFolders();
+        } catch (err) {
+          console.warn(`Scene #${sceneIdx + 1} 이미지 생성 실패 ➔ 샘플 이미지 대체:`, err.message);
+          try {
+            const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+            const demoData = await demoRes.json();
+            const sampleImg = demoData.demo_images[sceneIdx % demoData.demo_images.length];
+            setSceneImages(prev => ({
+              ...prev,
+              [sceneIdx]: {
+                image_url: sampleImg.image_url,
+                image_path: sampleImg.image_path,
+                prompt: promptToUse
+              }
+            }));
+          } catch (demoErr) {
+            setError(`[샘플 이미지 로드 오류] ${demoErr.message}`);
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Final Step 6: Merge Track A (TTS + SRT) and Track B (Video/Images)
+      const handleRenderVideo = async () => {
+        if (renderedVideo && (renderedVideo.video_url || renderedVideo.filename)) {
+          setLoadingMsg("기존 최종 합성 결과물 영상이 존재하여 스킵합니다.");
+          setCurrentStep(6);
+          return;
+        }
+
+        let currentAudioPath = ttsOutput ? ttsOutput.audio_path : null;
+        let currentSrtPath = ttsOutput ? ttsOutput.srt_path : null;
+        let currentDuration = ttsOutput ? (ttsOutput.duration_seconds || 10.0) : 10.0;
+
+        if (!currentAudioPath) {
+          const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+          const demoData = await demoRes.json();
+          currentAudioPath = demoData.audio_path;
+          currentSrtPath = demoData.srt_path;
+          currentDuration = demoData.duration_seconds || 10.0;
+        }
+
+        let imagePaths = [];
+        if (flowVideos && flowVideos.length > 0) {
+          imagePaths = flowVideos.map(v => v.video_path);
+        } else {
+          imagePaths = scenes.map((s, idx) => {
+            return sceneImages[idx] ? sceneImages[idx].image_path : null;
+          }).filter(p => p !== null);
+        }
+
+        if (imagePaths.length === 0) {
+          const resDemo = await fetch('/api/demo/setup', { method: 'POST' });
+          const dataDemo = await resDemo.json();
+          imagePaths = dataDemo.demo_images.map(img => img.image_path);
+        }
+
+        setLoading(true);
+        setLoadingMsg("트랙 A(TTS 오디오+SRT 자막)와 트랙 B(영상 클립)를 하나로 최종 합성 렌더링 중...");
+        setError(null);
+
+        try {
+          const res = await fetch('/api/render/video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_paths: imagePaths,
+              audio_path: currentAudioPath,
+              srt_path: currentSrtPath,
+              duration: currentDuration,
+              aspect_ratio: "9:16",
+              folder_name: selectedFolder
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setRenderedVideo(data);
+          setCurrentStep(6);
+          fetchProjectFolders();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // FULL AUTOMATION PIPELINE: 100% Guaranteed Execution with Demo Fallback on API Key error
+      const handleRunFullAutomation = async () => {
+        if (!fullScript.trim()) {
+          setError("대본이 작성되지 않았습니다. 대본을 먼저 입력해 주세요.");
+          return;
+        }
+
+        setError(null);
+        setLoading(true);
+
+        try {
+          // --- STEP 2: ElevenLabs TTS & SRT (Integrated / Fallback / Skip) ---
+          setCurrentStep(2);
+          let ttsData = null;
+
+          if (ttsOutput && (ttsOutput.audio_path || ttsOutput.audio_url)) {
+            setLoadingMsg("⚡ [전 과정 자동화] 1/3단계: 기존 TTS 음성/자막 데이터 사용 (TTS 스텝 스킵)...");
+            ttsData = ttsOutput;
+          } else {
+            setLoadingMsg("⚡ [전 과정 자동화] 1/3단계: ElevenLabs TTS 음성 및 SRT 자막 생성 중...");
+
+            if (elevenlabsKey) {
+              try {
+                const ttsRes = await fetch('/api/generate/tts-srt', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    elevenlabs_key: elevenlabsKey,
+                    text: fullScript,
+                    voice_id: selectedVoice,
+                    folder_name: selectedFolder
+                  })
+                });
+                const resJson = await ttsRes.json();
+                if (!resJson.error) ttsData = resJson;
+              } catch (e) {
+                console.warn("TTS API Fallback trigger:", e);
+              }
+            }
+
+            if (!ttsData) {
+              setLoadingMsg("⚡ [전 과정 자동화] API Key 미입력/오류 ➔ 샘플 오디오 및 SRT 자막으로 자동 대체 중...");
+              const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+              ttsData = await demoRes.json();
+            }
+            setTtsOutput(ttsData);
+          }
+
+          // --- STEP 4: GPT Video Prompts (Integrated / Fallback) ---
+          setCurrentStep(4);
+          setLoadingMsg("⚡ [전 과정 자동화] 2/3단계: GPT 기반 장면별 비디오/이미지 프롬프트 생성 중...");
+
+          const currentScenes = fullScript.split('\n').filter(l => l.trim().length > 0).map((line, idx) => ({
+            id: idx,
+            text: line,
+            prompt: `Cinematic 8k video of ${line.slice(0, 80)}, photorealistic, 60fps, dynamic camera motion`
+          }));
+
+          let newPrompts = {};
+          if (openaiKey) {
+            try {
+              const promptRes = await fetch('/api/generate/video-prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  openai_key: openaiKey,
+                  scenes: currentScenes,
+                  folder_name: selectedFolder
+                })
+              });
+              const promptData = await promptRes.json();
+              if (!promptData.error && promptData.prompts) {
+                promptData.prompts.forEach(p => {
+                  newPrompts[p.scene_index] = p.prompt;
+                });
+              }
+            } catch (e) {
+              console.warn("GPT Prompts Fallback trigger:", e);
+            }
+          }
+
+          if (Object.keys(newPrompts).length === 0) {
+            currentScenes.forEach((sc, idx) => {
+              newPrompts[idx] = `Cinematic 8k video, photorealistic, ${sc.text}, slow camera motion, 60fps`;
+            });
+          }
+          setVideoPrompts(newPrompts);
+
+          // --- PREPARE SCENE IMAGES / FALLBACK ---
+          setLoadingMsg("⚡ [전 과정 자동화] 장면 배경 이미지 자동 준비 중...");
+          let imagePaths = [];
+          const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+          const demoData = await demoRes.json();
+
+          const updatedSceneImages = { ...sceneImages };
+          for (let i = 0; i < currentScenes.length; i++) {
+            if (!updatedSceneImages[i]) {
+              const pToUse = newPrompts[i] || currentScenes[i].prompt;
+              let fetchedImg = null;
+              if (openaiKey) {
+                try {
+                  const imgRes = await fetch('/api/generate/image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      openai_key: openaiKey,
+                      prompt: pToUse,
+                      scene_index: i,
+                      folder_name: selectedFolder
+                    })
+                  });
+                  const imgData = await imgRes.json();
+                  if (!imgData.error) fetchedImg = imgData;
+                } catch (e) {
+                  console.warn(`Scene #${i + 1} image generation error:`, e);
+                }
+              }
+
+              if (!fetchedImg) {
+                const sampleImg = demoData.demo_images[i % demoData.demo_images.length];
+                fetchedImg = {
+                  image_url: sampleImg.image_url,
+                  image_path: sampleImg.image_path
+                };
+              }
+
+              updatedSceneImages[i] = {
+                image_url: fetchedImg.image_url,
+                image_path: fetchedImg.image_path,
+                prompt: pToUse
+              };
+            }
+            imagePaths.push(updatedSceneImages[i].image_path);
+          }
+          setSceneImages(updatedSceneImages);
+
+          // --- STEP 6: Final MP4 Merge (Skip if renderedVideo already exists) ---
+          setCurrentStep(6);
+          if (renderedVideo && (renderedVideo.video_url || renderedVideo.filename)) {
+            setLoadingMsg("⚡ [전 과정 자동화] 3/3단계: 기존 비디오 결과물이 존재하여 합성 렌더링 스킵 완료!");
+          } else {
+            setLoadingMsg("⚡ [전 과정 자동화] 3/3단계: 오디오 + 자막 + 영상 최종 MP4 비디오 합성 중...");
+
+            const renderRes = await fetch('/api/render/video', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image_paths: imagePaths,
+                audio_path: ttsData.audio_path,
+                srt_path: ttsData.srt_path,
+                duration: ttsData.duration_seconds || 10.0,
+                aspect_ratio: "9:16",
+                folder_name: selectedFolder
+              })
+            });
+            const renderData = await renderRes.json();
+            if (renderData.error) {
+              throw new Error(`[Step 6 비디오 합성 오류] ${renderData.error}`);
+            }
+
+            setRenderedVideo(renderData);
+          }
+          fetchProjectFolders();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Demo Mode Actions: Full Automation for Test Demo Tab
+      const handleLoadDemoSetup = async () => {
+        if (demoData && (demoData.audio_path || demoData.audio_url)) {
+          setLoadingMsg("기존 테스트 샘플 데이터가 존재하여 스킵합니다.");
+          return;
+        }
+
+        setLoading(true);
+        setLoadingMsg("API Key 필요 없는 샘플 자막, 오디오, 씬 이미지 준비 중...");
+        setError(null);
+
+        try {
+          const res = await fetch('/api/demo/setup', { method: 'POST' });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          setDemoData(data);
+          if (data.demo_prompt) {
+            setCombinedPrompt(data.demo_prompt);
+          } else {
+            setCombinedPrompt(defaultSamplePrompt);
+          }
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleRenderDemoVideo = async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+          let dataSetup = demoData || ttsOutput;
+          if (dataSetup && (dataSetup.audio_path || dataSetup.audio_url)) {
+            setLoadingMsg("⚡ [테스트 자동화] 1/2단계: 기존 TTS/샘플 데이터 사용 (스킵)...");
+          } else {
+            setLoadingMsg("⚡ [테스트 자동화] 1/2단계: 예시 오디오, 타임스탬프 SRT, 샘플 이미지 준비 중...");
+            const resSetup = await fetch('/api/demo/setup', { method: 'POST' });
+            dataSetup = await resSetup.json();
+            if (dataSetup.error) {
+              throw new Error(`[테스트 샘플 셋업 오류] ${dataSetup.error}`);
+            }
+            setDemoData(dataSetup);
+          }
+
+          if (demoRenderedVideo && (demoRenderedVideo.video_url || demoRenderedVideo.filename)) {
+            setLoadingMsg("⚡ [테스트 자동화] 2/2단계: 기존 테스트 비디오 결과물이 존재하여 렌더링 스킵 완료!");
+            return;
+          }
+
+          setLoadingMsg("⚡ [테스트 자동화] 2/2단계: 예시 오디오 + 자막 + 샘플 이미지 비디오 합성 렌더링 중...");
+
+          const imgPaths = dataSetup.demo_images ? dataSetup.demo_images.map(img => img.image_path) : [];
+          const resRender = await fetch('/api/render/video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_paths: imgPaths,
+              audio_path: dataSetup.audio_path,
+              srt_path: dataSetup.srt_path,
+              duration: dataSetup.duration_seconds || 10.0,
+              aspect_ratio: "9:16"
+            })
+          });
+          const dataRender = await resRender.json();
+          if (dataRender.error) {
+            throw new Error(`[테스트 비디오 합성 렌더링 오류] ${dataRender.error}`);
+          }
+
+          setDemoRenderedVideo(dataRender);
+        } catch (err) {
+          console.error("Demo automation error:", err);
+          setError(err.message || "테스트 자동화 중 오류가 발생했습니다.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-100 font-sans">
+          {/* Top Navigation */}
+          <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-6 py-3 flex items-center justify-between text-white shadow">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-1.5 rounded-lg bg-blue-600">
+                <i data-lucide="clapperboard" className="w-5 h-5"></i>
+              </div>
+              <h1 className="text-base font-bold tracking-tight">AI Video Studio</h1>
+            </div>
+
+            {/* Main Tabs Header */}
+            <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+              <button
+                onClick={() => setActiveTab('studio')}
+                class={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === 'studio' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                영상 제작
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('demo');
+                  if (!demoData) handleLoadDemoSetup();
+                }}
+                class={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${activeTab === 'demo' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                <span>테스트 모드</span>
+                <span className="text-[9px] px-1 bg-amber-400 text-amber-950 font-extrabold rounded">Demo</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('settings')}
+                class={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                <span>API Key</span>
+                <span class={`w-2 h-2 rounded-full ${elevenlabsKey && openaiKey ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+              </button>
+
+              <a
+                href="/workflow.html"
+                target="_blank"
+                rel="noreferrer"
+                class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-700/60"
+                title="새 탭에서 워크플로우 설명 열기"
+              >
+                <i data-lucide="book-open" className="w-3.5 h-3.5 text-blue-400"></i>
+                <span>워크플로우 안내</span>
+              </a>
+            </div>
+          </header>
+
+          {/* MAIN CONTAINER */}
+          {(activeTab === 'studio' || activeTab === 'demo') && (
+            <main className="flex-1 max-w-6xl w-full mx-auto p-6 space-y-5">
+
+              {/* TOP BAR: WORKSPACE SELECTOR & ONE-CLICK RUN */}
+              <div className="bg-white border border-slate-200 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">작업 폴더:</span>
+                  <select
+                    value={selectedFolder}
+                    onChange={(e) => handleLoadProjectFolder(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 cursor-pointer"
+                  >
+                    {projectFolders.map(p => (
+                      <option key={p.name} value={p.name}>📁 {p.name}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => {
+                      const name = prompt("새 폴더명:");
+                      if (name) handleCreateProjectFolder(name);
+                    }}
+                    className="text-xs text-blue-600 hover:underline font-bold"
+                  >
+                    + 새 폴더
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleRunFullAutomation}
+                  disabled={loading}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow flex items-center space-x-1.5 transition disabled:opacity-50"
+                >
+                  <i data-lucide="zap" className="w-4 h-4"></i>
+                  <span>🚀 전 과정 실행</span>
+                </button>
+              </div>
+
+              {/* 4-STEP PROCESS BAR WITH EXECUTION BUTTONS */}
+              <div className="grid grid-cols-4 gap-3">
+                {/* Step 1 Node */}
+                <div
+                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 1 ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                >
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(1)}>
+                    <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 1</div>
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>1. 대본 작성</span>
+                      {fullScript.trim() && <span className="text-[10px] opacity-90">✓</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(1);
+                      handleScriptChange({ target: { value: fullScript } });
+                    }}
+                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 1 ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                  >
+                    <i data-lucide="check-circle" className="w-3.5 h-3.5"></i>
+                    <span>⚡ Step 1 대본 확정</span>
+                  </button>
+                </div>
+
+                {/* Step 2 Node */}
+                <div
+                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 2 || currentStep === 3 || currentStep === 4 ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                >
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(2)}>
+                    <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 2</div>
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>2. 음성 & 프롬프트</span>
+                      {ttsOutput && <span className="text-[10px] opacity-90">✓</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(2);
+                      handleGenerateTtsAndSrt();
+                      handleGenerateVideoPrompts();
+                    }}
+                    disabled={loading}
+                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 2 || currentStep === 3 || currentStep === 4 ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                  >
+                    <i data-lucide="play" className="w-3.5 h-3.5"></i>
+                    <span>⚡ Step 2 동시 생성</span>
+                  </button>
+                </div>
+
+                {/* Step 3 Node: Flow 영상 저장 */}
+                <div
+                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 5 ? 'bg-purple-600 text-white border-purple-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                >
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(5)}>
+                    <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 3</div>
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>3. Flow 영상 저장</span>
+                      {flowVideos.length > 0 && <span className="text-[10px] opacity-90">✓ ({flowVideos.length}개)</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(5);
+                    }}
+                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition ${currentStep === 5 ? 'bg-white text-purple-700 hover:bg-purple-50' : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                  >
+                    <i data-lucide="folder-plus" className="w-3.5 h-3.5"></i>
+                    <span>📁 Step 3 영상 저장</span>
+                  </button>
+                </div>
+
+                {/* Step 4 Node: 최종 MP4 합성 */}
+                <div
+                  class={`p-3 rounded-xl border flex flex-col justify-between transition ${currentStep === 6 ? 'bg-emerald-600 text-white border-emerald-600 shadow' : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                >
+                  <div className="cursor-pointer" onClick={() => setCurrentStep(6)}>
+                    <div className="text-[10px] font-bold uppercase opacity-80 mb-0.5">Step 4</div>
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>4. 최종 MP4 합성</span>
+                      {renderedVideo && <span className="text-[10px] opacity-90">✓</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(6);
+                      handleRenderVideo();
+                    }}
+                    disabled={loading}
+                    class={`mt-2.5 w-full py-1.5 px-2 text-[11px] font-bold rounded-lg flex items-center justify-center space-x-1 transition disabled:opacity-50 ${currentStep === 6 ? 'bg-white text-emerald-800 hover:bg-emerald-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}
+                  >
+                    <i data-lucide="video" className="w-3.5 h-3.5"></i>
+                    <span>⚡ Step 4 합성 렌더링</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Notification */}
+              {error && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-rose-800 text-sm shadow-sm">
+                  <div className="flex items-center space-x-3">
+                    <i data-lucide="alert-circle" className="w-5 h-5 text-rose-600 shrink-0"></i>
+                    <span className="font-medium">{error}</span>
+                  </div>
+                  <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+              )}
+
+              {/* Loading Indicator Overlay */}
+              {loading && (
+                <div className="palette-card p-6 rounded-2xl text-center space-y-3 animate-pulse" style={{ borderColor: '#66A3BF' }}>
+                  <div className="inline-block p-3 rounded-full text-white" style={{ backgroundColor: '#3368A0' }}>
+                    <i data-lucide="loader-2" className="w-8 h-8 animate-spin"></i>
+                  </div>
+                  <p className="text-sm font-semibold" style={{ color: '#3368A0' }}>{loadingMsg}</p>
+                </div>
+              )}
+
+              {/* STEP 1: SCRIPT & SCENE SPLIT */}
+              {currentStep === 1 && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  <div className="lg:col-span-7 bg-white border border-slate-200 p-5 rounded-xl space-y-3 shadow-sm">
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">대본 작성</h2>
+                    <textarea
+                      rows="10"
+                      value={fullScript}
+                      onChange={handleScriptChange}
+                      placeholder="대본을 작성하세요 (줄바꿈으로 씬 분할)"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs leading-relaxed focus:bg-white focus:outline-none focus:border-blue-500"
+                    ></textarea>
+                  </div>
+
+                  <div className="lg:col-span-5 bg-slate-50 border border-slate-200 p-5 rounded-xl space-y-3">
+                    <h3 className="text-xs font-bold text-slate-700">구분된 장면 ({scenes.length}개)</h3>
+                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                      {scenes.map((sc, i) => (
+                        <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs">
+                          <span className="font-bold text-blue-600">#{i + 1}</span> <span className="text-slate-800">{sc.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: TTS / SRT / PROMPTS */}
+              {(currentStep === 2 || currentStep === 3 || currentStep === 4 || currentStep === 5) && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  {/* TTS & SRT */}
+                  <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">ElevenLabs TTS & SRT</h2>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">음성 선택:</label>
+                        {voices.length > 0 ? (
+                          <select
+                            value={selectedVoice}
+                            onChange={(e) => setSelectedVoice(e.target.value)}
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                          >
+                            {voices.map(v => (
+                              <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={selectedVoice}
+                            onChange={(e) => setSelectedVoice(e.target.value)}
+                            className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                          />
+                        )}
+                      </div>
+
+                      {/* TTS Audio Post-Processing (Silence Cut & Speed controls) */}
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <i data-lucide="scissors" className="w-3.5 h-3.5 text-blue-600"></i>
+                            공백 제거 & 배속 설정
+                          </span>
+                          <label className="flex items-center space-x-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={removeSilence}
+                              onChange={(e) => setRemoveSilence(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded"
+                            />
+                            <span className="text-xs font-bold text-slate-600">공백(무음) 자르기</span>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">무음 기준 데시벨(dB)</label>
+                            <select
+                              value={silenceDb}
+                              onChange={(e) => setSilenceDb(Number(e.target.value))}
+                              className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs font-semibold"
+                            >
+                              <option value={-20}>-20 dB (약한 무음)</option>
+                              <option value={-30}>-30 dB (보통 무음)</option>
+                              <option value={-40}>-40 dB (기본 권장)</option>
+                              <option value={-50}>-50 dB (강한 무음)</option>
+                              <option value={-60}>-60 dB (초미세 무음)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">재생 배속 (Speed)</label>
+                            <select
+                              value={audioSpeed}
+                              onChange={(e) => setAudioSpeed(Number(e.target.value))}
+                              className="w-full p-1.5 bg-white border border-slate-300 rounded text-xs font-semibold"
+                            >
+                              <option value={1.0}>1.0x (원래 속도)</option>
+                              <option value={1.1}>1.1x 배속</option>
+                              <option value={1.2}>1.2x 배속</option>
+                              <option value={1.3}>1.3x 배속</option>
+                              <option value={1.4}>1.4x 배속</option>
+                              <option value={1.5}>1.5x 배속</option>
+                              <option value={1.6}>1.6x 배속</option>
+                              <option value={1.7}>1.7x 배속</option>
+                              <option value={1.8}>1.8x 배속</option>
+                              <option value={1.9}>1.9x 배속</option>
+                              <option value={2.0}>2.0x (2배속)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {ttsOutput && (
+                          <button
+                            onClick={handleApplyAudioPostProcessing}
+                            disabled={loading}
+                            className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center space-x-1 transition disabled:opacity-50"
+                          >
+                            <i data-lucide="refresh-cw" className="w-3.5 h-3.5"></i>
+                            <span>🔊 후처리(데시벨/배속) 즉시 적용</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {ttsOutput && (
+                        <div className="space-y-2 border-t pt-3">
+                          <audio controls key={ttsOutput.audio_url} className="w-full h-8">
+                            <source src={ttsOutput.audio_url} type="audio/mpeg" />
+                          </audio>
+                          <pre className="max-h-36 p-3 bg-slate-900 text-emerald-400 text-[11px] font-mono rounded-lg overflow-y-auto">
+                            {ttsOutput.srt_content}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SINGLE INTEGRATED PROMPT */}
+                  <div className="lg:col-span-7 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI 영상 프롬프트 (단일 프롬프트)</h2>
+                        <p className="text-[11px] text-slate-500">독립된 영상 동시 생성을 위한 1개 통합 프롬프트입니다.</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyPrompt(combinedPrompt)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5 shrink-0"
+                      >
+                        <i data-lucide="copy" className="w-3.5 h-3.5"></i>
+                        <span>{copiedIdx === 'single' ? "복사완료 ✓" : "프롬프트 전체 복사"}</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <textarea
+                        rows="9"
+                        value={combinedPrompt}
+                        onChange={(e) => setCombinedPrompt(e.target.value)}
+                        className="w-full p-3.5 bg-slate-900 text-emerald-400 font-mono text-xs leading-relaxed rounded-xl shadow-inner border border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="통합 프롬프트를 입력하세요..."
+                      ></textarea>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <button
+                          onClick={handleAutomateFlowVideo}
+                          disabled={loading}
+                          className="py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <i data-lucide="bot" className="w-3.5 h-3.5"></i>
+                          <span>🤖 Flow 브라우저 자동 입력 & 생성</span>
+                        </button>
+                        <button
+                          onClick={() => setCurrentStep(5)}
+                          className="py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                        >
+                          <i data-lucide="folder-plus" className="w-3.5 h-3.5"></i>
+                          <span>📁 수동 파일 업로드 (Step 3 이동) ➔</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: FLOW AI VIDEO SAVE / UPLOAD */}
+              {currentStep === 5 && (
+                <div className="bg-white border border-slate-200 p-6 rounded-xl space-y-5 shadow-sm">
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <div>
+                      <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="folder-down" className="w-4 h-4 text-purple-600"></i>
+                        <span>Flow AI 생성 영상 업로드 & 저장 (Step 3)</span>
+                      </h2>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Flow AI 등에서 통합 프롬프트로 생성한 비디오 파일들(.mp4, .mov)을 업로드하여 저장하세요.
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleAutomateFlowVideo}
+                        disabled={loading}
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <i data-lucide="bot" className="w-3.5 h-3.5"></i>
+                        <span>🤖 Flow 자동 생성 실행</span>
+                      </button>
+                      <button
+                        onClick={() => setCurrentStep(6)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5"
+                      >
+                        <span>최종 MP4 합성 단계로 이동 ➔</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* File Upload Box */}
+                  <div className="border-2 border-dashed border-purple-300 bg-purple-50/50 hover:bg-purple-50 p-6 rounded-2xl text-center space-y-2 transition cursor-pointer relative">
+                    <input
+                      type="file"
+                      multiple
+                      accept="video/*"
+                      onChange={(e) => handleUploadFlowVideos(e.target.files)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="w-10 h-10 mx-auto rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                      <i data-lucide="upload-cloud" className="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-purple-900">클릭하거나 비디오 파일(.mp4)을 드래그하여 업로드</p>
+                      <p className="text-[11px] text-purple-600 mt-0.5">Flow에서 다운로드한 3개 영상을 한 번에 선택 가능합니다.</p>
+                    </div>
+                  </div>
+
+                  {/* Saved Flow Video Clips Grid */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-700">저장된 Flow 영상 목록 ({flowVideos.length}개)</h3>
+                      {flowVideos.length > 0 && (
+                        <span className="text-[11px] text-emerald-600 font-bold">✓ Step 4 합성 렌더링 시 자동 적용됩니다</span>
+                      )}
+                    </div>
+
+                    {flowVideos.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                        아직 저장된 Flow 영상이 없습니다. 박스를 클릭하여 다운받은 MP4 비디오를 업로드하세요.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {flowVideos.map((v, idx) => (
+                          <div key={idx} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow relative group">
+                            <div className="aspect-[9/16] bg-black relative">
+                              <video src={v.video_url} controls className="w-full h-full object-cover"></video>
+                              <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded shadow">
+                                Clip #{idx + 1}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteFlowVideo(v.video_name)}
+                                className="absolute top-1.5 right-1.5 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded shadow transition"
+                                title="삭제"
+                              >
+                                <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
+                              </button>
+                            </div>
+                            <div className="p-2 bg-slate-800 text-[10px] text-slate-300 font-mono truncate border-t border-slate-700">
+                              {v.video_name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: FINAL MP4 MERGE */}
+              {currentStep === 6 && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">3. 최종 비디오 합성</h2>
+                    
+                    <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">
+                      <div className="flex justify-between"><span>오디오:</span><span className="font-bold text-emerald-600">{ttsOutput ? '준비완료' : '샘플대체'}</span></div>
+                      <div className="flex justify-between"><span>자막:</span><span className="font-bold text-emerald-600">{ttsOutput ? '준비완료' : '샘플대체'}</span></div>
+                      <div className="flex justify-between"><span>비율:</span><span className="font-bold text-slate-900">9:16 (숏폼)</span></div>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-7 bg-slate-900 text-white p-5 rounded-xl space-y-4 shadow-lg flex flex-col justify-center items-center text-center min-h-[320px]">
+                    {renderedVideo ? (
+                      <div className="space-y-3 w-full max-w-[260px]">
+                        <div className="aspect-[9/16] bg-black rounded-xl overflow-hidden border border-slate-700">
+                          <video controls src={renderedVideo.video_url} className="w-full h-full object-cover" autoPlay></video>
+                        </div>
+                        <a
+                          href={renderedVideo.video_url}
+                          download
+                          className="block w-full py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg shadow hover:bg-emerald-700"
+                        >
+                          MP4 다운로드
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">좌측 버튼을 누르면 완성된 비디오가 나타납니다.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </main>
+          )}
+
+          {/* TAB 3: API KEYS */}
+          {activeTab === 'settings' && (
+            <main className="flex-1 max-w-xl w-full mx-auto p-6">
+              <div className="bg-white border border-slate-200 p-6 rounded-xl space-y-4 shadow-sm">
+                <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">API Key 설정</h2>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">ElevenLabs Key:</label>
+                    <input
+                      type="password"
+                      value={elevenlabsKey}
+                      onChange={(e) => setElevenlabsKey(e.target.value)}
+                      placeholder="sk_..."
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">OpenAI Key:</label>
+                    <input
+                      type="password"
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                      placeholder="sk-proj-..."
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSaveSuccessMsg(true);
+                      setTimeout(() => setSaveSuccessMsg(false), 2000);
+                    }}
+                    className="w-full py-2.5 bg-blue-600 text-white text-xs font-bold rounded-lg"
+                  >
+                    저장하기
+                  </button>
+                  {saveSuccessMsg && <p className="text-xs text-emerald-600 font-bold text-center">✓ 저장되었습니다.</p>}
+                </div>
+              </div>
+            </main>
+          )}
+
+          <footer className="py-3 text-center text-[11px] text-slate-400 border-t bg-white">
+            AI Video Studio
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+
+</html>

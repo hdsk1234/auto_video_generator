@@ -372,46 +372,72 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 os.makedirs(media_dir, exist_ok=True)
                 os.makedirs(images_dir, exist_ok=True)
 
+                folder_name = data.get("folder_name", "folder_1").strip()
+                user_script = data.get("script", "").strip()
+
+                if not user_script and folder_name:
+                    script_file = os.path.join(RESULT_DIR, folder_name, "script.txt")
+                    if os.path.exists(script_file):
+                        with open(script_file, "r", encoding="utf-8") as f:
+                            user_script = f.read().strip()
+
                 demo_audio_path = os.path.join(media_dir, "demo_audio.mp3")
                 demo_srt_path = os.path.join(media_dir, "demo_subtitles.srt")
 
-                # Generate demo audio (5s sine tone converted to mp3 if missing)
-                if not os.path.exists(demo_audio_path):
-                    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=523:duration=10", "-c:a", "libmp3lame", demo_audio_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # Generate dynamic SRT based on user's actual script if provided
+                if user_script:
+                    lines = [l.strip() for l in user_script.split("\n") if l.strip()]
+                    srt_blocks = []
+                    sec_per_line = 3.0
+                    total_dur = max(len(lines) * sec_per_line, 5.0)
 
-                # Generate demo SRT content
-                demo_srt_content = """1\n00:00:00,000 --> 00:00:02,500\n[테스트 모드] 안녕하세요! AI 영상 제작 테스트입니다.\n\n2\n00:00:02,500 --> 00:00:05,000\nAPI Key 없이도 FFmpeg 서버 합성 성능을 체험해보세요.\n\n3\n00:00:05,000 --> 00:00:07,500\n3번째 장면: 고화질 샘플 배경 이미지 슬라이드\n\n4\n00:00:07,500 --> 00:00:10,000\n4번째 장면: 자막과 음성, 비디오가 하나로 합성됩니다."""
+                    for idx, line in enumerate(lines, 1):
+                        start_sec = (idx - 1) * sec_per_line
+                        end_sec = idx * sec_per_line
+                        start_m, start_s = divmod(int(start_sec), 60)
+                        start_h, start_m = divmod(start_m, 60)
+                        start_ms = int((start_sec - int(start_sec)) * 1000)
+
+                        end_m, end_s = divmod(int(end_sec), 60)
+                        end_h, end_m = divmod(end_m, 60)
+                        end_ms = int((end_sec - int(end_sec)) * 1000)
+
+                        time_str = f"{start_h:02d}:{start_m:02d}:{start_s:02d},{start_ms:03d} --> {end_h:02d}:{end_m:02d}:{end_s:02d},{end_ms:03d}"
+                        srt_blocks.append(f"{idx}\n{time_str}\n{line}")
+
+                    demo_srt_content = "\n\n".join(srt_blocks)
+                    duration_sec = total_dur
+                else:
+                    demo_srt_content = """1\n00:00:00,000 --> 00:00:02,500\n[테스트 모드] 안녕하세요! AI 영상 제작 테스트입니다.\n\n2\n00:00:02,500 --> 00:00:05,000\nAPI Key 없이도 FFmpeg 서버 합성 성능을 체험해보세요.\n\n3\n00:00:05,000 --> 00:00:07,500\n3번째 장면: 고화질 샘플 배경 이미지 슬라이드\n\n4\n00:00:07,500 --> 00:00:10,000\n4번째 장면: 자막과 음성, 비디오가 하나로 합성됩니다."""
+                    duration_sec = 10.0
+
                 with open(demo_srt_path, "w", encoding="utf-8") as f:
                     f.write(demo_srt_content)
 
-                # Generate 4 colorful sample scene images
-                colors = ["#3368A0", "#66A3BF", "#475569", "#0F172A"]
-                demo_images = []
-                for idx, color in enumerate(colors, 1):
-                    img_path = os.path.join(images_dir, f"demo_scene_{idx}.png")
-                    if not os.path.exists(img_path):
-                        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={color}:s=1080x1920:d=1", "-frames:v", "1", img_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    demo_images.append({
-                        "scene_index": idx - 1,
-                        "image_url": f"/static/images/demo_scene_{idx}.png",
-                        "image_path": img_path
-                    })
+                # Generate demo audio with appropriate duration
+                dur_int = int(duration_sec) + 1
+                subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"sine=frequency=523:duration={dur_int}", "-c:a", "libmp3lame", demo_audio_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                demo_prompt = """다음 3개의 프롬프트로 각각 독립된 영상을 동시에 생성해줘:
-1. 노을이 지는 해변을 달리는 백마, 시네마틱 4k
-2. 비 내리는 사이버펑크 도시의 네온사인 골목, 드론 샷
-3. 깊은 숲속에서 빛나는 신비로운 버섯 군락, 매크로 렌즈"""
+                # Also save to folder_1 if folder_name is provided
+                if folder_name:
+                    p_dir = os.path.join(RESULT_DIR, folder_name)
+                    os.makedirs(p_dir, exist_ok=True)
+                    import shutil
+                    p_audio = os.path.join(p_dir, "tts_audio.mp3")
+                    p_srt = os.path.join(p_dir, "subtitles.srt")
+                    shutil.copyfile(demo_audio_path, p_audio)
+                    shutil.copyfile(demo_srt_path, p_srt)
+                    shutil.copyfile(p_audio, os.path.join(p_dir, "raw_tts_audio.mp3"))
+                    shutil.copyfile(p_srt, os.path.join(p_dir, "raw_subtitles.srt"))
 
                 return self.send_json_success({
                     "status": "success",
-                    "audio_url": "/static/media/demo_audio.mp3",
+                    "audio_url": f"/static/media/demo_audio.mp3?t={int(os.times().elapsed * 1000)}",
                     "audio_path": demo_audio_path,
-                    "srt_url": "/static/media/demo_subtitles.srt",
+                    "srt_url": f"/static/media/demo_subtitles.srt?t={int(os.times().elapsed * 1000)}",
                     "srt_path": demo_srt_path,
                     "srt_content": demo_srt_content,
-                    "duration_seconds": 10.0,
-                    "demo_images": demo_images,
-                    "demo_prompt": demo_prompt
+                    "duration_seconds": duration_sec
                 })
 
             elif path == "/api/elevenlabs/voices":
@@ -459,16 +485,25 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                     voice_id=voice_id,
                     output_audio_path=audio_path,
                     output_srt_path=srt_path,
-                    remove_silence=remove_silence,
+                    remove_silence=False,
                     silence_db=silence_db,
-                    speed=speed
+                    speed=1.0
                 )
+
+                # Always refresh raw backup with the newly generated audio & srt
+                if folder_name and os.path.exists(audio_path):
+                    import shutil
+                    raw_audio_path = os.path.join(p_dir, "raw_tts_audio.mp3")
+                    raw_srt_path = os.path.join(p_dir, "raw_subtitles.srt")
+                    shutil.copyfile(audio_path, raw_audio_path)
+                    if os.path.exists(srt_path):
+                        shutil.copyfile(srt_path, raw_srt_path)
 
                 return self.send_json_success({
                     "status": "success",
-                    "audio_url": audio_url,
+                    "audio_url": f"{audio_url}?t={int(os.times().elapsed * 1000)}",
                     "audio_path": audio_path,
-                    "srt_url": srt_url,
+                    "srt_url": f"{srt_url}?t={int(os.times().elapsed * 1000)}",
                     "srt_path": srt_path,
                     "srt_content": res["srt_content"],
                     "duration_seconds": res["duration_seconds"]

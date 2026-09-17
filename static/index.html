@@ -471,7 +471,7 @@
           });
           const data = await res.json();
           if (data.error) throw new Error(data.error);
-          
+
           await fetchProjectFolders();
           await handleLoadProjectFolder(cleanName);
         } catch (err) {
@@ -571,28 +571,31 @@
         }
       };
 
-      // Track A: Step 2 & 3 (TTS & SRT) with automatic Demo Sample Fallback
+      // Track A: Step 2 (TTS & SRT) with automatic Demo Sample Fallback
       const handleGenerateTtsAndSrt = async () => {
-        if (ttsOutput && (ttsOutput.audio_path || ttsOutput.audio_url)) {
-          setLoadingMsg("기존 TTS 음성 및 자막 데이터가 존재하여 스킵합니다.");
-          setCurrentStep(3);
+        const scriptToUse = (fullScript && fullScript.trim()) ? fullScript.trim() : "";
+        if (!scriptToUse) {
+          setError("Step 1 대본이 비어있습니다. 대본을 먼저 작성해주세요.");
           return;
         }
 
         setLoading(true);
-        setLoadingMsg("ElevenLabs TTS 오디오 생성 및 with_timestamps 기반 SRT 자막 작성 중...");
+        setLoadingMsg("대본 기반 음성 및 자막(SRT) 생성 중...");
         setError(null);
+
+        // Save current script to folder immediately
+        handleSaveScriptToFolder(scriptToUse);
 
         try {
           if (!elevenlabsKey) {
-            throw new Error("ElevenLabs API Key 미입력 ➔ 샘플 오디오 및 SRT 자막으로 자동 대체합니다.");
+            throw new Error("ElevenLabs API Key가 설정되지 않아, Step 1 대본으로 테스트 모드 자막을 생성합니다.");
           }
           const res = await fetch('/api/generate/tts-srt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               elevenlabs_key: elevenlabsKey,
-              text: fullScript,
+              text: scriptToUse,
               voice_id: selectedVoice,
               folder_name: selectedFolder,
               remove_silence: removeSilence,
@@ -604,12 +607,18 @@
           if (data.error) throw new Error(data.error);
 
           setTtsOutput(data);
-          setCurrentStep(3);
           fetchProjectFolders();
         } catch (err) {
-          console.warn("TTS API 실패 또는 키 미입력 ➔ 샘플 데모 데이터 적용:", err.message);
+          console.warn("TTS API 호출 실패 또는 키 미입력 ➔ Step 1 대본 기반 자막 생성:", err.message);
           try {
-            const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
+            const demoRes = await fetch('/api/demo/setup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                folder_name: selectedFolder,
+                script: scriptToUse
+              })
+            });
             const demoData = await demoRes.json();
             setTtsOutput({
               audio_url: demoData.audio_url,
@@ -619,9 +628,15 @@
               srt_content: demoData.srt_content,
               duration_seconds: demoData.duration_seconds || 10.0
             });
-            setCurrentStep(3);
+            fetchProjectFolders();
+
+            if (!elevenlabsKey) {
+              setError("💡 ElevenLabs API Key가 없어 Step 1 대본 기반으로 테스트 자막을 생성했습니다. 실제 AI 음성을 생성하려면 우측 상단 [API Key 설정] 탭에서 ElevenLabs 키를 입력하세요.");
+            } else {
+              setError(`[ElevenLabs API 안내] ${err.message} ➔ Step 1 대본 기반으로 자막을 생성했습니다.`);
+            }
           } catch (demoErr) {
-            setError(`[샘플 오디오 로드 오류] ${demoErr.message}`);
+            setError(`[자막 생성 오류] ${demoErr.message}`);
           }
         } finally {
           setLoading(false);
@@ -943,48 +958,16 @@
             setTtsOutput(ttsData);
           }
 
-          // --- STEP 4: GPT Video Prompts (Integrated / Fallback) ---
-          setCurrentStep(4);
-          setLoadingMsg("⚡ [전 과정 자동화] 2/3단계: GPT 기반 장면별 비디오/이미지 프롬프트 생성 중...");
+          // --- STEP 3: 자막 기반 이미지 생성 (Gemini Imagen 3 / Demo Fallback) ---
+          setCurrentStep(3);
+          setLoadingMsg("⚡ [전 과정 자동화] 2/3단계: 자막 기반 씬별 이미지 생성 중...");
 
           const currentScenes = fullScript.split('\n').filter(l => l.trim().length > 0).map((line, idx) => ({
             id: idx,
             text: line,
-            prompt: `Cinematic 8k video of ${line.slice(0, 80)}, photorealistic, 60fps, dynamic camera motion`
+            prompt: `${line.slice(0, 80)}, photorealistic, cinematic lighting, 8k resolution, vertical 9:16 video scene`
           }));
 
-          let newPrompts = {};
-          if (openaiKey) {
-            try {
-              const promptRes = await fetch('/api/generate/video-prompts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  openai_key: openaiKey,
-                  scenes: currentScenes,
-                  folder_name: selectedFolder
-                })
-              });
-              const promptData = await promptRes.json();
-              if (!promptData.error && promptData.prompts) {
-                promptData.prompts.forEach(p => {
-                  newPrompts[p.scene_index] = p.prompt;
-                });
-              }
-            } catch (e) {
-              console.warn("GPT Prompts Fallback trigger:", e);
-            }
-          }
-
-          if (Object.keys(newPrompts).length === 0) {
-            currentScenes.forEach((sc, idx) => {
-              newPrompts[idx] = `Cinematic 8k video, photorealistic, ${sc.text}, slow camera motion, 60fps`;
-            });
-          }
-          setVideoPrompts(newPrompts);
-
-          // --- PREPARE SCENE IMAGES / FALLBACK ---
-          setLoadingMsg("⚡ [전 과정 자동화] 장면 배경 이미지 자동 준비 중...");
           let imagePaths = [];
           const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
           const demoData = await demoRes.json();
@@ -992,24 +975,26 @@
           const updatedSceneImages = { ...sceneImages };
           for (let i = 0; i < currentScenes.length; i++) {
             if (!updatedSceneImages[i]) {
-              const pToUse = newPrompts[i] || currentScenes[i].prompt;
+              const pToUse = currentScenes[i].prompt;
               let fetchedImg = null;
-              if (openaiKey) {
+
+              if (geminiKey) {
                 try {
-                  const imgRes = await fetch('/api/generate/image', {
+                  const imgRes = await fetch('/api/generate/gemini-image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      openai_key: openaiKey,
+                      gemini_key: geminiKey,
                       prompt: pToUse,
                       scene_index: i,
-                      folder_name: selectedFolder
+                      folder_name: selectedFolder,
+                      aspect_ratio: '9:16'
                     })
                   });
                   const imgData = await imgRes.json();
                   if (!imgData.error) fetchedImg = imgData;
                 } catch (e) {
-                  console.warn(`Scene #${i + 1} image generation error:`, e);
+                  console.warn(`Scene #${i + 1} Gemini image generation error:`, e);
                 }
               }
 
@@ -1031,8 +1016,8 @@
           }
           setSceneImages(updatedSceneImages);
 
-          // --- STEP 6: Final MP4 Merge (Skip if renderedVideo already exists) ---
-          setCurrentStep(6);
+          // --- STEP 5: Final MP4 Merge (Skip if renderedVideo already exists) ---
+          setCurrentStep(5);
           if (renderedVideo && (renderedVideo.video_url || renderedVideo.filename)) {
             setLoadingMsg("⚡ [전 과정 자동화] 3/3단계: 기존 비디오 결과물이 존재하여 합성 렌더링 스킵 완료!");
           } else {
@@ -1424,16 +1409,19 @@
                 </div>
               )}
 
-              {/* STEP 2: TTS / SRT / PROMPTS */}
+              {/* STEP 2: TTS & SUBTITLES (음성 및 자막 전용) */}
               {currentStep === 2 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                  {/* TTS & SRT */}
-                  <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
-                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">ElevenLabs TTS & SRT</h2>
-                    
+                  {/* TTS Voice & Speed Settings */}
+                  <div className="lg:col-span-6 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <i data-lucide="mic" className="w-4 h-4 text-amber-600"></i>
+                      <span>ElevenLabs 음성 & 오디오 설정 (Step 2)</span>
+                    </h2>
+
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1">음성 선택:</label>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">음성 (Voice):</label>
                         {voices.length > 0 ? (
                           <select
                             value={selectedVoice}
@@ -1454,12 +1442,22 @@
                         )}
                       </div>
 
-                      {/* TTS Audio Post-Processing (Silence Cut & Speed controls) */}
-                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      {/* 1. TTS Generation Button */}
+                      <button
+                        onClick={handleGenerateTtsAndSrt}
+                        disabled={loading}
+                        className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <i data-lucide="mic" className="w-4 h-4"></i>
+                        <span>⚡ 음성, 자막 생성</span>
+                      </button>
+
+                      {/* 2. Audio Post-Processing Box (Silence Cut & Speed) */}
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                             <i data-lucide="scissors" className="w-3.5 h-3.5 text-blue-600"></i>
-                            공백 제거 & 배속 설정
+                            공백 제거 & 배속 후처리
                           </span>
                           <label className="flex items-center space-x-1.5 cursor-pointer">
                             <input
@@ -1510,72 +1508,54 @@
                           </div>
                         </div>
 
-                        {ttsOutput && (
-                          <button
-                            onClick={handleApplyAudioPostProcessing}
-                            disabled={loading}
-                            className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center space-x-1 transition disabled:opacity-50"
-                          >
-                            <i data-lucide="refresh-cw" className="w-3.5 h-3.5"></i>
-                            <span>🔊 후처리(데시벨/배속) 즉시 적용</span>
-                          </button>
-                        )}
+                        <button
+                          onClick={handleApplyAudioPostProcessing}
+                          disabled={loading || !ttsOutput}
+                          className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg shadow-sm flex items-center justify-center space-x-1.5 transition disabled:opacity-40"
+                        >
+                          <i data-lucide="refresh-cw" className="w-3.5 h-3.5"></i>
+                          <span>🔊 후처리(무음제거/배속) 즉시 적용</span>
+                        </button>
                       </div>
-
-                      {ttsOutput && (
-                        <div className="space-y-2 border-t pt-3">
-                          <audio controls key={ttsOutput.audio_url} className="w-full h-8">
-                            <source src={ttsOutput.audio_url} type="audio/mpeg" />
-                          </audio>
-                          <pre className="max-h-36 p-3 bg-slate-900 text-emerald-400 text-[11px] font-mono rounded-lg overflow-y-auto">
-                            {ttsOutput.srt_content}
-                          </pre>
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* SINGLE INTEGRATED PROMPT */}
-                  <div className="lg:col-span-7 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI 영상 프롬프트 (단일 프롬프트)</h2>
-                        <p className="text-[11px] text-slate-500">독립된 영상 동시 생성을 위한 1개 통합 프롬프트입니다.</p>
+                  {/* Generated Audio & Subtitles Preview */}
+                  <div className="lg:col-span-6 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                          <i data-lucide="file-text" className="w-4 h-4 text-emerald-600"></i>
+                          <span>생성된 음성 및 자막 미리보기</span>
+                        </h2>
+                        {ttsOutput && (
+                          <span className="text-[11px] text-emerald-600 font-bold">✓ 생성 완료</span>
+                        )}
                       </div>
-                      <button
-                        onClick={() => handleCopyPrompt(combinedPrompt)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5 shrink-0"
-                      >
-                        <i data-lucide="copy" className="w-3.5 h-3.5"></i>
-                        <span>{copiedIdx === 'single' ? "복사완료 ✓" : "프롬프트 전체 복사"}</span>
-                      </button>
-                    </div>
 
-                    <div className="space-y-2">
-                      <textarea
-                        rows="9"
-                        value={combinedPrompt}
-                        onChange={(e) => setCombinedPrompt(e.target.value)}
-                        className="w-full p-3.5 bg-slate-900 text-emerald-400 font-mono text-xs leading-relaxed rounded-xl shadow-inner border border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="통합 프롬프트를 입력하세요..."
-                      ></textarea>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button
-                          onClick={handleAutomateFlowVideo}
-                          disabled={loading}
-                          className="py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-                        >
-                          <i data-lucide="bot" className="w-3.5 h-3.5"></i>
-                          <span>🤖 Flow 브라우저 자동 입력 & 생성</span>
-                        </button>
-                        <button
-                          onClick={() => setCurrentStep(3)}
-                          className="py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                        >
-                          <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
-                          <span>🎨 자막 기반 Gemini 이미지 생성 (Step 3 이동) ➔</span>
-                        </button>
-                      </div>
+                      {ttsOutput ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">오디오 재생:</label>
+                            <audio controls key={ttsOutput.audio_url} className="w-full h-9">
+                              <source src={ttsOutput.audio_url} type="audio/mpeg" />
+                            </audio>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">SRT 자막 내용 (총 {scenes.length}개 씬):</label>
+                            <pre className="max-h-60 p-3.5 bg-slate-900 text-emerald-400 text-[11px] font-mono rounded-xl overflow-y-auto leading-relaxed border border-slate-800">
+                              {ttsOutput.srt_content}
+                            </pre>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-12 text-center text-slate-400 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2">
+                          <i data-lucide="volume-2" className="w-8 h-8 mx-auto opacity-40 text-slate-400"></i>
+                          <p className="font-semibold text-slate-600">아직 생성된 음성·자막이 없습니다.</p>
+                          <p className="text-[11px] text-slate-400">좌측의 '⚡ TTS 음성 및 자막 생성' 버튼을 클릭하세요.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1602,12 +1582,6 @@
                       >
                         <i data-lucide="wand-2" className="w-3.5 h-3.5"></i>
                         <span>⚡ 씬별 이미지 전체 생성</span>
-                      </button>
-                      <button
-                        onClick={() => setCurrentStep(4)}
-                        className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5"
-                      >
-                        <span>Step 4 Flow 영상 생성으로 이동 ➔</span>
                       </button>
                     </div>
                   </div>
@@ -1652,7 +1626,7 @@
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {(scenes.length > 0 ? scenes : Object.keys(sceneImages).map(k => ({ index: Number(k), text: `Scene #${Number(k)+1}` }))).map((sc, idx) => {
+                        {(scenes.length > 0 ? scenes : Object.keys(sceneImages).map(k => ({ index: Number(k), text: `Scene #${Number(k) + 1}` }))).map((sc, idx) => {
                           const imgObj = sceneImages[idx] || sceneImages[String(idx)];
                           return (
                             <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-between space-y-2.5">
@@ -1729,12 +1703,6 @@
                         <i data-lucide="bot" className="w-3.5 h-3.5"></i>
                         <span>🤖 Flow 자동 생성 실행</span>
                       </button>
-                      <button
-                        onClick={() => setCurrentStep(5)}
-                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5"
-                      >
-                        <span>최종 MP4 합성 단계로 이동 ➔</span>
-                      </button>
                     </div>
                   </div>
 
@@ -1802,7 +1770,7 @@
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   <div className="lg:col-span-5 bg-white border border-slate-200 p-5 rounded-xl space-y-4 shadow-sm">
                     <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">최종 비디오 합성 (Step 5)</h2>
-                    
+
                     <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">
                       <div className="flex justify-between"><span>오디오:</span><span className="font-bold text-emerald-600">{ttsOutput ? '준비완료' : '샘플대체'}</span></div>
                       <div className="flex justify-between"><span>자막:</span><span className="font-bold text-emerald-600">{ttsOutput ? '준비완료' : '샘플대체'}</span></div>

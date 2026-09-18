@@ -232,16 +232,9 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945";
-
     function App() {
       // Main navigation tab state: 'studio' | 'demo'
       const [activeTab, setActiveTab] = useState('studio');
-
-      // API Keys state (ElevenLabs API Key is hardcoded)
-      const [elevenlabsKey] = useState(ELEVENLABS_API_KEY);
-      const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('openai_key') || '');
-      const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_key') || '');
       const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
       // Workflow pipeline step: 1 (Script) | 2 (TTS & SRT) | 3 (Gemini Images) | 5 (Flow Video) | 6 (Merge)
@@ -311,16 +304,11 @@
         fetchProjectFolders();
         handleLoadProjectFolder('folder_1');
         fetchVoices();
-        localStorage.setItem('elevenlabs_key', ELEVENLABS_API_KEY);
+        // Clear any leftover plaintext keys from browser storage
+        localStorage.removeItem('elevenlabs_key');
+        localStorage.removeItem('gemini_key');
+        localStorage.removeItem('openai_key');
       }, []);
-
-      useEffect(() => {
-        localStorage.setItem('openai_key', openaiKey);
-      }, [openaiKey]);
-
-      useEffect(() => {
-        localStorage.setItem('gemini_key', geminiKey);
-      }, [geminiKey]);
 
       useEffect(() => {
         if (window.lucide) {
@@ -491,13 +479,6 @@
         }
       };
 
-      const handleSaveKeys = () => {
-        localStorage.setItem('elevenlabs_key', elevenlabsKey);
-        localStorage.setItem('openai_key', openaiKey);
-        setSaveSuccessMsg(true);
-        setTimeout(() => setSaveSuccessMsg(false), 3000);
-      };
-
       const splitScriptIntoScenes = (scriptText) => {
         const lines = scriptText.split('\n').filter(l => l.trim().length > 0);
         const newScenes = lines.map((line, idx) => ({
@@ -524,7 +505,7 @@
           const res = await fetch('/api/elevenlabs/voices', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ elevenlabs_key: elevenlabsKey })
+            body: JSON.stringify({})
           });
           const data = await res.json();
           if (data.error) throw new Error(data.error);
@@ -753,11 +734,6 @@
 
       // Step 3: 자막 기반 Gemini Imagen 3 씬별 이미지 일괄 생성
       const handleGenerateGeminiImages = async () => {
-        if (!geminiKey.trim()) {
-          setError("Google Gemini API Key가 필요합니다. Step 3 화면에서 입력해주세요.");
-          return;
-        }
-
         setLoading(true);
         setLoadingMsg("Google Gemini Imagen 3 API로 자막 기반 씬 이미지 일괄 생성 중...");
         setError(null);
@@ -767,7 +743,6 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              gemini_key: geminiKey,
               folder_name: selectedFolder,
               aspect_ratio: '9:16',
               prompts: videoPrompts
@@ -794,10 +769,6 @@
       };
 
       const handleGenerateSingleGeminiImage = async (sceneIdx) => {
-        if (!geminiKey.trim()) {
-          setError("Google Gemini API Key가 필요합니다.");
-          return;
-        }
         const scene = scenes[sceneIdx];
         const promptToUse = videoPrompts[sceneIdx] || (scene ? scene.text : "");
 
@@ -810,7 +781,6 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              gemini_key: geminiKey,
               prompt: promptToUse,
               scene_index: sceneIdx,
               folder_name: selectedFolder,
@@ -922,27 +892,24 @@
           } else {
             setLoadingMsg("⚡ [전 과정 자동화] 1/3단계: ElevenLabs TTS 음성 및 SRT 자막 생성 중...");
 
-            if (elevenlabsKey) {
-              try {
-                const ttsRes = await fetch('/api/generate/tts-srt', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    elevenlabs_key: elevenlabsKey,
-                    text: fullScript,
-                    voice_id: selectedVoice,
-                    folder_name: selectedFolder
-                  })
-                });
-                const resJson = await ttsRes.json();
-                if (!resJson.error) ttsData = resJson;
-              } catch (e) {
-                console.warn("TTS API Fallback trigger:", e);
-              }
+            try {
+              const ttsRes = await fetch('/api/generate/tts-srt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: fullScript,
+                  voice_id: selectedVoice,
+                  folder_name: selectedFolder
+                })
+              });
+              const resJson = await ttsRes.json();
+              if (!resJson.error) ttsData = resJson;
+            } catch (e) {
+              console.warn("TTS API Fallback trigger:", e);
             }
 
             if (!ttsData) {
-              setLoadingMsg("⚡ [전 과정 자동화] API Key 미입력/오류 ➔ 샘플 오디오 및 SRT 자막으로 자동 대체 중...");
+              setLoadingMsg("⚡ [전 과정 자동화] API 오류 ➔ 샘플 오디오 및 SRT 자막으로 자동 대체 중...");
               const demoRes = await fetch('/api/demo/setup', { method: 'POST' });
               ttsData = await demoRes.json();
             }
@@ -969,24 +936,21 @@
               const pToUse = currentScenes[i].prompt;
               let fetchedImg = null;
 
-              if (geminiKey) {
-                try {
-                  const imgRes = await fetch('/api/generate/gemini-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      gemini_key: geminiKey,
-                      prompt: pToUse,
-                      scene_index: i,
-                      folder_name: selectedFolder,
-                      aspect_ratio: '9:16'
-                    })
-                  });
-                  const imgData = await imgRes.json();
-                  if (!imgData.error) fetchedImg = imgData;
-                } catch (e) {
-                  console.warn(`Scene #${i + 1} Gemini image generation error:`, e);
-                }
+              try {
+                const imgRes = await fetch('/api/generate/gemini-image', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    prompt: pToUse,
+                    scene_index: i,
+                    folder_name: selectedFolder,
+                    aspect_ratio: '9:16'
+                  })
+                });
+                const imgData = await imgRes.json();
+                if (!imgData.error) fetchedImg = imgData;
+              } catch (e) {
+                console.warn(`Scene #${i + 1} Gemini image generation error:`, e);
               }
 
               if (!fetchedImg) {
@@ -1568,23 +1532,14 @@
                     </div>
                   </div>
 
-                  {/* Gemini API Key Bar */}
-                  <div className="p-3 bg-rose-50/70 border border-rose-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-rose-900 flex items-center gap-1">
-                        <i data-lucide="key" className="w-3.5 h-3.5 text-rose-600"></i>
-                        Google Gemini API Key:
-                      </span>
-                      <input
-                        type="password"
-                        value={geminiKey}
-                        onChange={(e) => setGeminiKey(e.target.value)}
-                        placeholder="AIzaSy..."
-                        className="p-1.5 bg-white border border-rose-300 rounded text-xs font-mono w-56 sm:w-72"
-                      />
+                  {/* Gemini Model Info Bar */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center space-x-2 text-slate-700 font-semibold">
+                      <i data-lucide="sparkles" className="w-3.5 h-3.5 text-rose-500"></i>
+                      <span>Google Gemini Imagen 3 비주얼 생성 엔진</span>
                     </div>
-                    <div className="text-[11px] text-rose-700">
-                      모델: <code className="font-mono bg-rose-100 px-1 py-0.5 rounded">imagen-3.0-generate-002</code> (9:16 세로 숏폼)
+                    <div className="text-[11px] text-slate-500">
+                      모델: <code className="font-mono bg-white border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold">imagen-3.0-generate-002</code> (9:16 세로 숏폼)
                     </div>
                   </div>
 

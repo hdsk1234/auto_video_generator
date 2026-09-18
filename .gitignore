@@ -1,1 +1,10 @@
 venv/
+.env
+.env.*
+__pycache__/
+*.pyc
+result/*/images/
+result/*/flow_videos/
+result/*/final_video.mp4
+output/
+tmp/

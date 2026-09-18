@@ -5,17 +5,22 @@ import ssl
 
 OPENAI_IMAGE_URL = "https://api.openai.com/v1/images/generations"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+DEFAULT_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Unverified SSL context to handle macOS python certificate issues
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
-def generate_video_prompts(api_key: str, scenes: list, model: str = "gpt-4o-mini") -> list:
+def generate_video_prompts(api_key: str = None, scenes: list = None, model: str = "gpt-4o-mini") -> list:
     """
     Generates detailed AI Video Prompts (optimized for Flow / Kling / Runway / Luma)
     for each scene using OpenAI Chat Completion API.
     """
+    if scenes is None:
+        scenes = []
+    if not api_key:
+        api_key = DEFAULT_OPENAI_API_KEY
     if not api_key:
         # Fallback template prompt generator if API key is empty
         return [
@@ -98,10 +103,16 @@ def generate_video_prompts(api_key: str, scenes: list, model: str = "gpt-4o-mini
             for i, sc in enumerate(scenes)
         ]
 
-def generate_image(api_key: str, prompt: str, output_image_path: str, model: str = "dall-e-3", size: str = "1024x1024") -> str:
+def generate_image(api_key: str = None, prompt: str = "", output_image_path: str = "", model: str = "dall-e-3", size: str = "1024x1024") -> str:
     """
     Calls OpenAI DALL-E API to generate image from scene text prompt and saves to disk.
     """
+    if not api_key:
+        api_key = DEFAULT_OPENAI_API_KEY
+    if not api_key:
+        raise ValueError("OpenAI API Key is required")
+    if not prompt:
+        raise ValueError("Image prompt is required")
     payload = {
         "model": model,
         "prompt": prompt,

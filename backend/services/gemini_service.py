@@ -7,11 +7,12 @@ import re
 from typing import Dict, Any, List, Optional
 
 GEMINI_IMAGEN_MODEL = "imagen-3.0-generate-002"
+DEFAULT_GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 def generate_image_with_gemini(
-    api_key: str,
-    prompt: str,
-    output_image_path: str,
+    api_key: str = None,
+    prompt: str = "",
+    output_image_path: str = "",
     aspect_ratio: str = "9:16"
 ) -> str:
     """
@@ -19,7 +20,9 @@ def generate_image_with_gemini(
     standard library urllib를 사용하여 추가 패키지 없이 동작합니다.
     """
     if not api_key:
-        raise ValueError("Gemini API Key is required")
+        api_key = DEFAULT_GEMINI_API_KEY
+    if not api_key:
+        raise ValueError("Gemini API Key가 설정되지 않았습니다.")
     if not prompt:
         raise ValueError("Image prompt is required")
 

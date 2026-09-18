@@ -23,8 +23,23 @@ from backend.services.gemini_service import generate_image_with_gemini, parse_sr
 from backend.services.video_renderer import render_video_with_ffmpeg
 
 PORT = 8080
-DEFAULT_ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def load_env_file():
+    env_file = os.path.join(PROJECT_ROOT, ".env")
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k:
+                        os.environ[k] = v
+
+load_env_file()
+
 STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 RESULT_DIR = os.path.join(PROJECT_ROOT, "result")
@@ -442,7 +457,8 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             elif path == "/api/elevenlabs/voices":
-                api_key = data.get("elevenlabs_key", "").strip() or DEFAULT_ELEVENLABS_API_KEY
+                load_env_file()
+                api_key = data.get("elevenlabs_key", "").strip() or os.environ.get("ELEVENLABS_API_KEY", "")
                 try:
                     voices = get_voices(api_key)
                 except Exception as e:
@@ -456,11 +472,12 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json_success({"voices": voices})
 
             elif path == "/api/generate/tts-srt":
+                load_env_file()
                 import importlib
                 import backend.services.elevenlabs_service as elevenlabs_mod
                 importlib.reload(elevenlabs_mod)
 
-                api_key = data.get("elevenlabs_key", "").strip() or DEFAULT_ELEVENLABS_API_KEY
+                api_key = data.get("elevenlabs_key", "").strip() or os.environ.get("ELEVENLABS_API_KEY", "")
                 text = data.get("text", "").strip()
                 voice_id = data.get("voice_id", "").strip()
                 folder_name = data.get("folder_name", "").strip()
@@ -518,7 +535,8 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             elif path == "/api/generate/video-prompts":
-                api_key = data.get("openai_key", "").strip()
+                load_env_file()
+                api_key = data.get("openai_key", "").strip() or os.environ.get("OPENAI_API_KEY", "")
                 scenes = data.get("scenes", [])
                 folder_name = data.get("folder_name", "").strip()
 
@@ -536,7 +554,8 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             elif path == "/api/generate/image":
-                api_key = data.get("openai_key", "").strip()
+                load_env_file()
+                api_key = data.get("openai_key", "").strip() or os.environ.get("OPENAI_API_KEY", "")
                 prompt = data.get("prompt", "").strip()
                 scene_index = data.get("scene_index", 0)
                 folder_name = data.get("folder_name", "").strip()
@@ -571,14 +590,15 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             elif path == "/api/generate/gemini-image":
-                api_key = data.get("gemini_key", "").strip()
+                load_env_file()
+                api_key = data.get("gemini_key", "").strip() or os.environ.get("GEMINI_API_KEY", "")
                 prompt = data.get("prompt", "").strip()
                 scene_index = data.get("scene_index", 0)
                 folder_name = data.get("folder_name", "folder_1").strip()
                 aspect_ratio = data.get("aspect_ratio", "9:16").strip()
 
                 if not api_key:
-                    return self.send_json_error(400, "Gemini API Key is required")
+                    return self.send_json_error(400, "Gemini API Key가 .env에 설정되지 않았습니다.")
                 if not prompt:
                     return self.send_json_error(400, "Image prompt is required")
 
@@ -605,13 +625,14 @@ class AutoVideoHandler(http.server.SimpleHTTPRequestHandler):
 
             elif path == "/api/generate/gemini-scenes-images":
                 # 자막(SRT) 또는 씬 리스트를 바탕으로 각 씬별 Gemini 이미지 자동 생성
-                api_key = data.get("gemini_key", "").strip()
+                load_env_file()
+                api_key = data.get("gemini_key", "").strip() or os.environ.get("GEMINI_API_KEY", "")
                 folder_name = data.get("folder_name", "folder_1").strip()
                 aspect_ratio = data.get("aspect_ratio", "9:16").strip()
                 custom_prompts = data.get("prompts", {})  # dict of scene_index -> prompt
 
                 if not api_key:
-                    return self.send_json_error(400, "Gemini API Key is required")
+                    return self.send_json_error(400, "Gemini API Key가 .env에 설정되지 않았습니다.")
 
                 p_dir = os.path.join(RESULT_DIR, folder_name)
                 img_dir = os.path.join(p_dir, "images")

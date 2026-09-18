@@ -7,7 +7,7 @@ import ssl
 from backend.services.srt_generator import generate_srt_from_timestamps
 
 ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
-DEFAULT_ELEVENLABS_API_KEY = "sk_7fd47907245c458e3d11ccb07d0e6f0900f74bcea25d7945"
+DEFAULT_ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 
 # Unverified SSL context to handle macOS python certificate issues
 ssl_context = ssl.create_default_context()
